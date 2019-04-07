@@ -31,5 +31,7 @@
 *.swo
 *.swp
 
+debug/*
 build/*
 .vscode/*
+

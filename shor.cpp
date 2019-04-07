@@ -222,22 +222,6 @@ void add_colinear(
   F = tF;
 }
 
-bool is_convex(
-  const Eigen::MatrixXd& P
-){
-  for(int i=0;i<P.rows();i++){
-    int prev = (i-1+P.rows())%P.rows();
-    int next = (i+1)%P.rows();
-    double a[2] = {P(prev,0),P(prev,1)};
-    double b[2] = {P(i,0),P(i,1)};
-    double c[2] = {P(next,0),P(next,1)};
-    short r = igl::copyleft::cgal::orient2D(a,b,c);
-    if(r < 0)
-        return false;
-  }
-  return true;
-}
-
 void subdivide_polygon(
   const Eigen::MatrixXd& V,
   const Eigen::MatrixXi& F,
@@ -248,7 +232,7 @@ void subdivide_polygon(
   std::map<std::pair<int,int>, int> H;
   Eigen::VectorXi G(F.rows());
   Eigen::MatrixXi FF,FFI;
-    igl::triangle_triangle_adjacency(F,FF,FFI);
+  igl::triangle_triangle_adjacency(F,FF,FFI);
   L.resize(F.rows());
   for(int i=0;i<F.rows();i++){
     G(i) = i; // every face belongs to itself
@@ -406,15 +390,8 @@ bool Shor_van_wyck(
   Eigen::VectorXi nR;
   igl::copyleft::cgal::ear_clipping(mP,mR,D,eF,nP);
   igl::slice(mR,D,1,nR);
-  igl::opengl::glfw::Viewer vr;
-  for(int i=0;i<nP.rows();i++){
-    int i_1 = (i+1) % nP.rows();
-    vr.data().add_edges(nP.row(i),nP.row(i_1),Eigen::RowVector3d(1,0,0));
-    if(nR(i)!=0)
-      vr.data().add_points(nP.row(i),Eigen::RowVector3d(0,0,0));
-  }
-  vr.launch();
-  // [weakly-self-overlapping test (dynamic programming)]
+
+  // [weakly-self-overlapping test]
   Eigen::MatrixXi nF;
   bool succ = (nP.rows()==0) || weakly_self_overlapping(nP,nR,nF);
   if(!succ){
@@ -438,9 +415,11 @@ bool Shor_van_wyck(
     return true;
   }
   V = P;
+
   // [simplify mesh (subdivide into small polygons)]
   std::vector<std::vector<int>> L;
   subdivide_polygon(V,F,L);
+
   // [refine each small polygon]
   Eigen::MatrixXd V0 = V;
   simplify_triangulation(V0,L,V,F);

@@ -1,7 +1,37 @@
 #include <igl/opengl/glfw/Viewer.h>
+#include <igl/matrix_to_list.h>
+#include "matchmaker.h"
+#include "target_polygon.h"
+#include "plot.h"
 #include "loader.h"
 #include "shor.h"
 #include "argh.h"
+
+void random_internal_vertices(
+  const Eigen::MatrixXd& V,
+  const Eigen::MatrixXi& F,
+  Eigen::VectorXi& pi
+){
+  // [ generate 3 random points ]
+  std::vector<int> r;
+  Eigen::VectorXi bd;
+  std::vector<int> bd_list;
+  igl::boundary_loop(F,bd);
+  igl::matrix_to_list(bd,bd_list);
+  int seed = 10;
+  for(int i=0;i<3;i++){
+    int t = -1;
+    do{
+        srand(seed);
+        int z = rand();
+        t = z%V.rows();
+        seed=seed*4+i;
+    }while(std::find(bd_list.begin(),bd_list.end(),t)!=bd_list.end() || 
+           std::find(r.begin(),r.end(),t)!=r.end());
+    r.push_back(t);
+  }
+  igl::list_to_matrix(r,pi);
+}
 
 int main(int argc, char *argv[])
 {
@@ -27,11 +57,17 @@ int main(int argc, char *argv[])
   Eigen::VectorXi T,R;
   load_model(model,V,uv,F,polygon,R,T);
   
-  bool succ = Shor_van_wyck(polygon,R,"",V,F,true);
-  if(!succ) exit(0);
-  // Plot the mesh
-  igl::opengl::glfw::Viewer viewer;
-  viewer.data().set_mesh(V, F);
-  viewer.data().set_face_based(true);
-  viewer.launch();
+  Eigen::MatrixXd c(3,2);
+  c<<0,0,1,0,0,1;
+  Eigen::VectorXi ci;
+  random_internal_vertices(V,F,ci);
+  
+  std::vector<Eigen::MatrixXd> polys;
+  target_polygon(V,F,c,ci,polys);
+  
+  R.setZero(polys[0].rows());
+  match_maker(V,F,uv,c,ci,R,T,polys[0]);
+  igl::opengl::glfw::Viewer vr;
+  plot_mesh(vr,uv,F);
+
 }
