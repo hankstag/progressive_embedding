@@ -6,6 +6,7 @@
 
 void plot_polygon(
   igl::opengl::glfw::Viewer& viewer,
+  const Eigen::VectorXi& H,
   const Eigen::MatrixXd& poly
 );
 

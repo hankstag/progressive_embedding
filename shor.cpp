@@ -1,7 +1,7 @@
 #include "shor.h"
+#include "plot.h"
 #include <igl/boundary_loop.h>
 #include <igl/adjacency_list.h>
-#include <igl/opengl/glfw/Viewer.h>
 
 #include <igl/copyleft/cgal/orient2D.h>
 #include <igl/copyleft/cgal/ear_clipping.h>
@@ -390,7 +390,8 @@ bool Shor_van_wyck(
   Eigen::VectorXi nR;
   igl::copyleft::cgal::ear_clipping(mP,mR,D,eF,nP);
   igl::slice(mR,D,1,nR);
-
+  igl::opengl::glfw::Viewer vr;
+  plot_polygon(vr,nR,nP);
   // [weakly-self-overlapping test]
   Eigen::MatrixXi nF;
   bool succ = (nP.rows()==0) || weakly_self_overlapping(nP,nR,nF);

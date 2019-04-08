@@ -21,4 +21,10 @@ void load_model_with_seam(
     Eigen::VectorXi& bd
 );
 
+
+void load_matching_info(
+    std::string fname,
+    std::pair<int,int>& match
+);
+
 #endif

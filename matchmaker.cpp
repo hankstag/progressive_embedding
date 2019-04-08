@@ -503,18 +503,6 @@ void match_maker(
         std::vector<int> E; // traced path
 
         path_tracing(V,F,std::make_pair(T(l),T(r)),no_enter,mask_e,no_enter_f,TT,Vn,Fn,E);
-        // std::cout<<"path length: "<<E.size()<<std::endl;
-        // igl::opengl::glfw::Viewer vr;
-        // vr.data().set_mesh(Vn,Fn);
-        // for(int i=0;i<E.size()-1;i++){
-        //   int i_1 = i+1;
-        //   vr.data().add_edges(Vn.row(E[i]),Vn.row(E[i_1]),Eigen::RowVector3d(1,0,0));
-        // }
-        // for(int i=0;i<bi.rows();i++){
-        //   int i_1 = (i+1) % bi.rows();
-        //   vr.data().add_edges(Vn.row(bi(i)),Vn.row(bi(i_1)),Eigen::RowVector3d(0,1,0));
-        // }
-        // vr.launch();
         V = Vn;
         F = Fn;
         std::reverse(E.begin(),E.end());

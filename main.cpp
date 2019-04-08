@@ -47,11 +47,13 @@ int main(int argc, char *argv[])
   }
 
   int loop, threshold;
-  std::string model;
+  std::string model,uvfile;
   cmdl("-in") >> model;
+  cmdl("-uv") >> uvfile;
   // cmdl("-l",20) >> loop;
   // cmdl("-t",20) >> threshold;
-
+  #define QUAD
+  #ifndef QUAD
   Eigen::MatrixXd V,polygon,uv;
   Eigen::MatrixXi F;
   Eigen::VectorXi T,R;
@@ -67,6 +69,35 @@ int main(int argc, char *argv[])
   
   R.setZero(polys[0].rows());
   match_maker(V,F,uv,c,ci,R,T,polys[0]);
+  #else
+  // load model and uv
+  Eigen::MatrixXd V,uv,polygon;
+  Eigen::MatrixXi F,Fuv;
+  Eigen::VectorXi bd0,bd1;
+  load_model_with_seam(model,V,F,polygon,bd0);
+  
+  std::pair<int,int> match;
+  load_matching_info(uvfile,match);
+  Eigen::MatrixXd _polygon;
+  Eigen::VectorXi R;
+  load_model_with_seam(uvfile,uv,Fuv,_polygon,bd1);
+  uv.conservativeResize(uv.rows(),2);
+  int id0 = -1,id1 = -1;
+  for(int i=0;i<bd0.rows();i++){
+      if(bd0(i) == match.first)
+          id0 = i;
+      if(bd1(i) == match.second)
+          id1 = i;
+  }
+  int offset = (id1-id0+bd1.rows())%bd1.rows();
+  std::cout<<"setting rotation index..."<<std::endl;
+  set_rotation_index(uv,Fuv,R,offset);
+  assert(bd0.rows()==bd1.rows());
+
+  Eigen::VectorXi ci;
+  Eigen::MatrixXd c;
+  match_maker(V,F,uv,c,ci,R,bd0,polygon);
+  #endif
   igl::opengl::glfw::Viewer vr;
   plot_mesh(vr,uv,F);
 

@@ -69,3 +69,33 @@ void load_model_with_seam(
     if(uv.rows()!=0)
         igl::slice(uv,bd,1,polygon);
 }
+
+void load_matching_info(
+    std::string fname,
+    std::pair<int,int>& match
+){
+    // Open file, and check for error
+    FILE * obj_file = fopen(fname.c_str(),"r");
+    if(NULL==obj_file){
+        fprintf(stderr,"IOError: %s could not be opened...\n",
+                fname.c_str());
+        return;
+    }
+    #define LINE_MAX_S 2048
+    char line[LINE_MAX_S];
+    int line_no = 1;
+    while (fgets(line, LINE_MAX_S, obj_file) != NULL){
+        char type[LINE_MAX_S];
+        // Read first word containing type
+        if(sscanf(line, "%s",type) == 1){
+            char * l = &line[strlen(type)];
+            if(strlen(type) >= 1){
+                if (type[0] == 'b'){ // index of point constraints
+                    int x,y;
+                    sscanf(l,"%d%d\n",&x,&y);
+                    match = std::make_pair(x,y);
+                }
+            }
+        }
+    }
+}
