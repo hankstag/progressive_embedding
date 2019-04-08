@@ -23,25 +23,24 @@ void load_model(
     std::cout<<"model size: #F("<<F.rows()<<"), #V("<<V.rows()<<")"<<std::endl;
     std::cout<<"source #BD("<<D1.size()<<")"<<std::endl;
     std::cout<<"target #BD("<<D2.size()<<")"<<std::endl;
-    #define USEUV
-    #ifdef USEUV
-    Eigen::MatrixXd nV(uv.rows(),3);
-    for(int i=0;i<F.rows();i++){
-        nV.row(Fuv(i,0)) << V.row(F(i,0));
-        nV.row(Fuv(i,1)) << V.row(F(i,1));
-        nV.row(Fuv(i,2)) << V.row(F(i,2));
-    }
-    F = Fuv;
-    V = nV;
-    #endif
-    //fill_in_holes(V,F);
-    auto D = D2[0];
-    P.resize(D.size(),2);
-    T.resize(P.rows());
-    set_rotation_index(uv,Fuv,R);
-    for(int i=0;i<P.rows();i++){
-        P.row(i)<<uv.row(D[i]);
-        T(i) = D[i];
+    if(Fuv.rows()>0){
+      Eigen::MatrixXd nV(uv.rows(),3);
+      for(int i=0;i<F.rows();i++){
+          nV.row(Fuv(i,0)) << V.row(F(i,0));
+          nV.row(Fuv(i,1)) << V.row(F(i,1));
+          nV.row(Fuv(i,2)) << V.row(F(i,2));
+      }
+      F = Fuv;
+      V = nV;
+      //fill_in_holes(V,F);
+      auto D = D2[0];
+      P.resize(D.size(),2);
+      T.resize(P.rows());
+      set_rotation_index(uv,Fuv,R);
+      for(int i=0;i<P.rows();i++){
+          P.row(i)<<uv.row(D[i]);
+          T(i) = D[i];
+      }
     }
 }
 

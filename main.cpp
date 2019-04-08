@@ -1,10 +1,10 @@
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/matrix_to_list.h>
+
 #include "matchmaker.h"
 #include "target_polygon.h"
 #include "plot.h"
 #include "loader.h"
-#include "shor.h"
 #include "argh.h"
 
 void random_internal_vertices(
@@ -99,6 +99,6 @@ int main(int argc, char *argv[])
   match_maker(V,F,uv,c,ci,R,bd0,polygon);
   #endif
   igl::opengl::glfw::Viewer vr;
-  plot_mesh(vr,uv,F);
+  plot_mesh(vr,uv,F,{});
 
 }

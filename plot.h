@@ -13,7 +13,9 @@ void plot_polygon(
 void plot_mesh(
   igl::opengl::glfw::Viewer& viewer,
   const Eigen::MatrixXd& V,
-  const Eigen::MatrixXi& F
+  const Eigen::MatrixXi& F,
+  const std::vector<int>& id,
+  bool show_boundary=false
 );
 
 #endif

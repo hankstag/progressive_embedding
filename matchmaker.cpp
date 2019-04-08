@@ -18,7 +18,7 @@
 #include <igl/writeOBJ.h>
 #include <algorithm> 
 #include <unordered_set>
-//#include "progressive_embedding.h"
+#include "progressive_embedding.h"
 
 // precondition of Tutte's embedding
 // make sure the mesh is 3-connected
@@ -375,7 +375,7 @@ void match_maker(
   const Eigen::MatrixXd& P
 ){
   Eigen::VectorXi T = T_s;
-
+  remove_ears(V,F);
   // [ use Shor to get list of polygons ]
   Eigen::MatrixXd V2;
   Eigen::MatrixXi F2;
@@ -501,10 +501,7 @@ void match_maker(
         auto Vn = V;
         auto Fn = F;
         std::vector<int> E; // traced path
-
         path_tracing(V,F,std::make_pair(T(l),T(r)),no_enter,mask_e,no_enter_f,TT,Vn,Fn,E);
-        V = Vn;
-        F = Fn;
         std::reverse(E.begin(),E.end());
         splits[e] = E;
         assert(E.size()>=2);
@@ -521,7 +518,7 @@ void match_maker(
             on_path_v.insert(b);
         }
         sector_bar.insert(e);
-        igl::triangle_triangle_adjacency(F,TT,TTi);
+        //igl::triangle_triangle_adjacency(F,TT,TTi);
         igl::vertex_triangle_adjacency(V,F,VF,VFi);
         no_enter_f.clear();
         prapare_TT(F,no_enter_f,mask_e,VF,TT,TTi);
@@ -614,6 +611,6 @@ void match_maker(
     H1.conservativeResize(H1.rows(),2);
     // std::vector<int> S;
     // test_flip(H1,F,S);
-    //bool succ = progressive_fix(ci,nb,nbc,V,F,H1);
+    bool succ = progressive_fix(ci,nb,nbc,V,F,H1);
     uv = H1;
 }
