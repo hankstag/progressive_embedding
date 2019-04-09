@@ -6,6 +6,8 @@
 #include <igl/triangle_triangle_adjacency.h>
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/copyleft/cgal/orient2D.h>
+#include "plot.h"
+
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
 #include "local_smooth/local_smooth.h"
@@ -17,6 +19,60 @@
 #include <limits>
 #include "local_smooth/auto_grad.hpp"
 #define LOG
+
+int expand_to_boundary(
+  const Eigen::MatrixXd& V,
+  const Eigen::MatrixXi& F,
+  const Eigen::VectorXi& I,
+  const Eigen::MatrixXi& FF_s,
+  const int fid,
+  Eigen::MatrixXi& local_F
+){
+  Eigen::MatrixXi FF = FF_s;
+  std::set<int> N;
+  std::deque<int> Q;
+  N.clear();
+  int level = 0;
+  for(int i=0;i<FF.rows();i++){
+    for(int k=0;k<3;k++){
+      int k_1 = (k+1) % 3;
+      if(I(F(i,k)) && I(F(i,k_1)))
+        FF(i,k) = -1;
+    }
+  }
+  if(fid != -1){
+      Q.push_back(fid);
+      N.insert(fid);
+      while(!Q.empty()){
+          int f = Q.front();
+          Q.pop_front();
+          for(int i=0;i<3;i++){
+            if(FF(f,i)!=-1 && N.find(FF(f,i))==N.end()){
+              Q.push_back(FF(f,i));
+              N.insert(FF(f,i));
+            }
+          }
+      }
+  }
+  Q.clear();
+  local_F.resize(N.size(),3);
+  int i=0;
+  for(int x: N){    
+      local_F.row(i++)<<F.row(x);
+  }
+  std::cout<<"count interior points"<<std::endl;
+  int my_id = 0;
+  for(int i=0;i<local_F.rows();i++){
+    for(int k=0;k<3;k++){
+      int id = local_F(i,k);
+      if(!I(id)){
+        my_id = id;
+        //std::cout<<my_id<<std::endl;
+      }
+    }
+  }
+  return my_id;
+}
 
 void get_neighbor_at_level(
     const Eigen::MatrixXd& V,
@@ -33,7 +89,8 @@ void get_neighbor_at_level(
     N.clear();
     int level = 0;
     if(fid != -1){
-        Q.push_back(std::make_pair(fid,0));
+        std::pair<int,int> p(fid,0);
+        Q.push_back(p);
         N.insert(fid);
         int l = 0;
         while(l<neighbor && !Q.empty()){
@@ -43,7 +100,8 @@ void get_neighbor_at_level(
             Q.pop_front();
             for(int i=0;i<3;i++){
                 if(FF(f,i)!=-1 && N.find(FF(f,i))==N.end()){
-                    Q.push_back(std::make_pair(FF(f,i),l+1));
+                    std::pair<int,int> p(FF(f,i),l+1);
+                    Q.push_back(p);
                     N.insert(FF(f,i));
                 }
             }
@@ -165,7 +223,6 @@ std::pair<bool,double> flip_avoid_line_search(
     const Eigen::MatrixXd& V,
     Eigen::MatrixXd& uv,
     const Eigen::MatrixXi& F,
-    std::set<int>& bdr_s,
     int a0,
     int b,
     const Eigen::RowVectorXd& x, // initial guess for b is (x+a)/2
@@ -250,7 +307,383 @@ std::pair<bool,double> flip_avoid_line_search(
     }
     return std::make_pair(valid,maxenergy);
 }
+
 using Action = std::tuple<int,int,Eigen::MatrixXi,Eigen::VectorXi,bool>;
+
+void collect_invalid_elements(
+  const Eigen::MatrixXd& V,
+  const Eigen::MatrixXi& F,
+  const Eigen::MatrixXd& uv,
+  const double eps,
+  const double avg,
+  Eigen::VectorXi& I
+){
+  // [init Dirichlet energy]
+  std::cout<<"init dirichlet energy ... "<<std::endl;
+  Eigen::VectorXd Energy;
+  std::vector<int> FL(F.rows());
+  std::iota(FL.begin(),FL.end(),0);
+  compute_dirichlet_energy(avg,uv,F,FL,eps,Energy);
+  std::cout<<"done"<<std::endl;
+  
+  // [collect invalid elements]
+  std::cout<<"collect invalid elements"<<std::endl;
+  I.setZero(F.rows());
+  count_flipped_element(uv,F,I);
+  for(int i=0;i<F.rows();i++){
+    if(I(i)) continue;
+    if(!std::isfinite(Energy(i))||Energy(i)>eps)
+      I(i) = 1;
+  }
+}
+
+void collapse_invalid_elements(
+  const Eigen::MatrixXd& V,
+  Eigen::MatrixXi& F,
+  Eigen::MatrixXd& uv,
+  const Eigen::VectorXi& I,
+  const Eigen::VectorXi& B,
+  const double eps,
+  const double avg,
+  std::vector<Action>& L
+){
+  std::vector<int> FL(F.rows());
+  std::iota(FL.begin(),FL.end(),0);
+  Eigen::VectorXi EMAP,EE;
+  Eigen::MatrixXi E,EF,EI;
+  Eigen::MatrixXi dEF,dEI,allE;
+  igl::edge_flaps(F,E,allE,EMAP,EF,EI,dEF,dEI,EE);
+  std::vector<int> S;
+  for(int i=0;i<I.rows();i++){
+    if(I(i))
+      S.push_back(i);
+  }
+  while(S.size()!=0){
+    bool do_collapse = false;
+    for(int f: S){
+      typedef std::tuple<double,int,bool> edge_info;
+      std::vector<edge_info> f_info;
+      for(int k=0;k<3;k++){
+        double l = (uv.row(F(f,k))-uv.row(F(f,(k+1)%3))).norm();
+        bool on_bd = (B(F(f,k) == 1) || B(F(f,(k+1)%3)) == 1);
+        f_info.push_back(edge_info(l,k,on_bd));
+      }
+      std::sort(f_info.begin(),f_info.end());
+      // collapse it if valid
+      for(auto info: f_info){
+        int k = std::get<1>(info);
+        int e = F.rows()*((k+2)%3)+f;
+        int a = F(f,k), b = F(f,(k+1)%3);
+        std::vector<int> N;
+        //std::cout<<"try collpasing "<<a<<" and "<<b<<std::endl;
+        if(std::get<2>(info)) {
+            //std::cout<<"its on bd\n";
+            continue;
+        }
+        if(edge_collapse_is_valid(e,uv.row(b),uv,F,dEF,dEI,EE,allE,N)){
+            std::sort(N.begin(), N.end());
+            N.erase( std::unique( N.begin(), N.end() ), N.end() );
+            Eigen::VectorXi nbi;
+            igl::list_to_matrix(N,nbi);
+            Eigen::MatrixXd nb(N.size()*3,2);
+            Eigen::MatrixXi F_store(nbi.rows(),3);
+            // collect all the positions beside a and b
+            int fn = 0;
+            for(int fi: N){
+                if(F.row(fi).sum()==0) continue;
+                F_store.row(fn++)<<F.row(fi);
+            }
+            F_store.conservativeResize(fn,3);
+            Eigen::RowVector2d pt;
+            if(B(a) == 1){
+                // if a is boundary collapse to a
+                pt = uv.row(a);
+                L.push_back(Action(a,b,F_store,nbi,std::get<2>(info)));
+            }else if(B(b) == 1){
+                // if b is boundary collapse to b
+                pt = uv.row(b);
+                L.push_back(Action(b,a,F_store,nbi,std::get<2>(info)));
+            }else{
+                // otherwise collapse to a small index
+                pt = uv.row(std::min(a,b));
+                L.push_back(Action(std::max(a,b),std::min(a,b),F_store,nbi,std::get<2>(info)));
+            }
+            //std::cout<<uv.row(std::get<0>(L.back()))<<std::endl;
+            //std::cout<<uv.row(std::get<1>(L.back()))<<std::endl;
+            collapse_edge(e,pt,uv,F,dEF,dEI,EE,allE,{});
+            do_collapse = true;
+        }
+      }
+    }
+    S.clear();
+    test_flip(uv, F, S);
+    Eigen::VectorXd Energy;
+    compute_dirichlet_energy(avg,uv,F,FL,eps,Energy);
+    int valid_face = 0;
+    for(int i=0;i<F.rows();i++){
+      if(F.row(i).sum() == 0) continue;
+      valid_face++;
+      if(!std::isfinite(Energy(i)) || Energy(i)>eps){
+          if(std::find(S.begin(),S.end(),i) == S.end()){
+              S.push_back(i);
+          }
+      }
+    }
+    int neighbor = 0;
+    if(!do_collapse){
+      Eigen::MatrixXi FF,FFI; // adjacency map
+      igl::triangle_triangle_adjacency(F,FF,FFI);
+      std::cout<<"move to barycenter"<<std::endl;
+      int n = 0;
+      for(int fid: S){
+        std::cout<<n++<<"/"<<S.size()<<std::endl;
+        Eigen::MatrixXi local_F;
+        int interior_id=expand_to_boundary(V,F,B,FF,fid,local_F);
+        //igl::opengl::glfw::Viewer vr;
+        Eigen::RowVector2d the_center;
+        for(int i=0;i<local_F.rows();i++){
+          if(local_F.row(i).sum()!=0){
+            Eigen::RowVector2d barycenter = (uv.row(local_F(i,0)) + uv.row(local_F(i,1)) + uv.row(local_F(i,2))) / 3;
+            the_center += barycenter;
+          }
+        }
+        the_center /= local_F.rows();
+        uv.row(interior_id) << the_center;
+        break;
+        //plot_mesh(vr,uv,local_F,{});
+      }
+      neighbor++;
+    }else
+      neighbor = 0;
+    int invalid_size = S.size();
+    std::cout<<"invalid size "<<invalid_size<<std::endl;
+    std::cout<<"valid face "<<valid_face<<std::endl;
+    // also collapse its level-k neighbors
+    std::set<int> S_aux;
+    Eigen::MatrixXi FF,FFI; // adjacency map
+    igl::triangle_triangle_adjacency(F,FF,FFI);
+    Eigen::MatrixXi region;
+    for(int i=0;i<S.size() && neighbor!=0;i++){
+        Eigen::VectorXi nbs;
+        get_neighbor_at_level(uv,F,FF,S[i],neighbor,nbs,region);
+        //S_aux.insert(S[i]);
+        for(int j=0;j<nbs.rows();j++)
+            S_aux.insert(nbs(j));   
+    }
+    // for(int s: S_aux){
+    //     int count = 0;
+    //     for(int k=0;k<3;k++){
+    //         if(B(F(f,k)))
+    //             count++;
+    //         }
+    //     }
+    //     if(count == 2)
+    //         continue;
+    //     if(std::find(S.begin(),S.end(),s) == S.end())
+    //         S.push_back(s);
+    // }
+    // if((valid_face == invalid_size || !do_collapse) && flipped == 0)
+    //     invalid_size = 0;
+    // }
+  }
+}
+bool insert_vertex_back(
+  const std::vector<Action>& L,
+  const Eigen::VectorXi& B,
+  const Eigen::MatrixXd& V,
+  Eigen::MatrixXi& F,
+  Eigen::MatrixXd& uv
+){
+      // for every action in the list
+    igl::Timer timer;
+    timer.start();
+    bool rollback = false;
+    int degree = 2;
+    double total_time = 0.0;
+    int ii = 0;
+    for(;ii<L.size();ii++){
+        double time1 = timer.getElapsedTime();
+        std::cout<<"rollback "<<ii<<"/"<<L.size()<<std::endl;
+        std::cout<<std::get<0>(L[ii])<<" <-> "<<std::get<1>(L[ii])<<std::endl;
+        auto a = L[ii];
+        Eigen::MatrixXi ring = std::get<2>(a);
+        Eigen::VectorXi nbs = std::get<3>(a);
+        bool both_on_bd = std::get<4>(a);
+        // position candidates
+        //#define BRUTAL
+        bool found = false;
+        Eigen::RowVectorXd pos(2);
+        double minarea = std::numeric_limits<double>::min();
+        double maxenergy = std::numeric_limits<double>::max();
+        Eigen::MatrixXd cd;
+        int v0 = std::get<1>(a);
+        int v1 = std::get<0>(a);
+        auto uv_store = uv;
+        uv.row(v1) = uv.row(v0);
+        auto F_store = F;
+        for(int j=0;j<nbs.rows();j++)
+            F.row(nbs(j))<<ring.row(j);
+        double angle_sum_of_v0 = calculate_angle_sum(ring,uv,v0,v1);
+        if(angle_sum_of_v0 < igl::PI)
+            std::swap(v0,v1);
+        find_candidate_positions(uv,ring,v1,v0,cd); 
+        // update average area
+        Eigen::VectorXd area;
+        double avg = 0.0;
+        igl::doublearea(uv,F,area);
+        int ctf=0;
+        for(int k=0;k<area.rows();k++){
+            if(!isnan(area(k)) && !isinf(area(k))){
+                avg += area(k);
+                if(F.row(k).sum()!=0)
+                    ctf++;
+            }
+        }
+        //std::cout<<avg<<" divide into "<<ctf<<std::endl;
+        avg /= ctf;
+
+        std::cout<<"try pos: "<<cd.rows()<<std::endl;
+        //std::cout<<"use target area insertion "<<avg<<std::endl;
+        for(int j=0;j<cd.rows();j++){
+            Eigen::RowVector2d y;
+            std::pair<bool,double> z;
+            z = flip_avoid_line_search(V,uv,ring,v0,v1,cd.row(j),y,avg);
+            //std::cout<<"position "<<j<<": "<<std::get<0>(z)<<","<<std::get<1>(z)<<std::endl;
+            int count = 0;
+            if(std::get<0>(z) == true && std::get<1>(z)<maxenergy){
+                found = true;
+                pos << y(0),y(1);
+                maxenergy = std::get<1>(z);
+            }
+        }
+        if(found){
+            auto F_t = F;
+            int d = 0;
+            for(int i=0;i<F_t.rows();i++){
+                if(F.row(i).sum() != 0)
+                    F_t.row(d++)<<F.row(i);
+            }
+            F_t.conservativeResize(d,3);
+            std::cout<<"current face size "<<d<<"/"<<F.rows()<<std::endl;
+            uv.row(v1) << pos;
+            local_smoothing(V,F_t,B,uv,10,1e10);
+        }else{
+            F = F_store;
+            uv = uv_store;
+            // show the ring
+            Eigen::MatrixXi F_show(ring.rows(),3);
+            for(int i=0;i<ring.rows();i++){
+                F_show.row(i)<<ring.row(i);
+            }
+            // std::cout<<AAk<<std::endl;
+            uv.row(v1) = uv.row(v0);
+            for(int r=0;r<ring.rows();r++){
+                for(int k=0;k<3;k++){
+                    std::cout<<ring(r,k)<<" ";
+                }
+                std::cout<<std::endl;
+            }
+            std::map<int,int> ring_to_dump;
+            int c = 0;
+            Eigen::MatrixXi local_F = ring;
+            for(int t=0;t<ring.rows();t++){
+                for(int k=0;k<3;k++)
+                    if(ring_to_dump.find(ring(t,k))==ring_to_dump.end())
+                        ring_to_dump[ring(t,k)] = c++;
+            }
+            
+            for(int i=0;i<ring.rows();i++){
+                for(int k=0;k<3;k++){
+                    local_F(i,k)=ring_to_dump[ring(i,k)];
+                    std::cout<<ring_to_dump[ring(i,k)]<<" ";
+                }
+                std::cout<<std::endl;
+            }
+            Eigen::MatrixXd local_v(ring_to_dump.size(),2);
+            Eigen::MatrixXd local_v3(ring_to_dump.size(),3);
+            for(auto p: ring_to_dump){
+                local_v3.row(p.second)<<V.row(p.first);
+                local_v.row(p.second)<<uv.row(p.first);
+            }
+            std::vector<int> xx;
+            xx.resize(ring_to_dump.size());
+            Eigen::VectorXi xxt;
+            for(auto t: ring_to_dump)
+                xx[t.second] = t.first;
+            igl::list_to_matrix(xx,xxt);
+            Eigen::MatrixXd CN;
+            Eigen::MatrixXi FN;
+            igl::writeOBJ("small_region.obj",local_v3,local_F,CN,FN,local_v,local_F);
+            //igl::writeOFF("small_region.off",local_v,local_F);
+            std::streamsize ss = std::cout.precision();
+            std::cout<<std::setprecision(17)<<local_v<<std::endl;
+            std::cout << std::setprecision(6);
+            // std::cout<<"the collapse before this"<<std::endl;
+            Eigen::MatrixXi ring_prev = std::get<2>(L[ii+1]);
+            std::cout<<ring_prev<<std::endl;
+            uv = uv_store;
+            auto F_t = F;
+            int d = 0;
+            for(int i=0;i<F_t.rows();i++){
+                if(F.row(i).sum() != 0)
+                    F_t.row(d++)<<F.row(i);
+            }
+            F_t.conservativeResize(d,3);
+            auto uv_o = uv;
+            local_smoothing(V,F_t,B,uv,100,1e10);
+            ii--;
+        }
+        double time2 = timer.getElapsedTime();
+        total_time += (time2 - time1);
+        double expect_total_time = (total_time / (ii+1)) * L.size();
+        std::cout<<"expect time: "<<(expect_total_time-total_time)/60.0<<" mins "<<std::endl;
+    } 
+    return true;
+}
+
+bool progressive_embedding(
+  const Eigen::VectorXi& bi,
+  const Eigen::MatrixXd& b,
+  const Eigen::MatrixXd& V,
+  double eps,
+  Eigen::MatrixXi& F,
+  Eigen::MatrixXd& uv
+){
+
+  Eigen::VectorXd area;
+  igl::doublearea(uv,F,area);
+  double avg = 0;
+  for(int k=0;k<area.rows();k++){
+      if(std::isfinite(area(k))){
+          avg += area(k);
+      }
+  }
+  avg /= area.rows();
+  // avg = area.array().isFinite().select(0,area)
+
+  // Mark boundary vertices
+  Eigen::VectorXi B;
+  B.setZero(V.rows());
+  for(int i=0;i<bi.rows();i++)
+    B(bi(i)) = 1;
+
+  Eigen::VectorXi I;
+  collect_invalid_elements(V,F,uv,eps,avg,I);
+  
+  std::vector<Action> L;
+  collapse_invalid_elements(V,F,uv,I,B,eps,avg,L);
+
+  // invert vertex in reverse order of L
+  std::reverse(L.begin(),L.end());
+  insert_vertex_back(L,B,V,F,uv);
+  Eigen::VectorXi T;
+  count_flipped_element(uv,F,T);
+  std::cout<<"flipped: "<<T.sum()<<std::endl;
+  igl::opengl::glfw::Viewer vr;
+  vr.data().set_mesh(uv,F);
+  vr.launch();
+  return true;
+}
 
 bool progressive_fix(
     const Eigen::VectorXi& cs,
@@ -260,6 +693,11 @@ bool progressive_fix(
     Eigen::MatrixXi& F,
     Eigen::MatrixXd& uv
 ){
+    double eps = 1e20;
+    Eigen::MatrixXi F_test=F;
+    Eigen::MatrixXd uv_test=uv;
+    progressive_embedding(bi,b,V,eps,F_test,uv_test);
+    
     igl::Timer timer;
     timer.start();
     double t0 = timer.getElapsedTime();
@@ -274,27 +712,39 @@ bool progressive_fix(
         }
     }
     avg /= area.rows();
-
+    std::cout<<"averge area is "<<avg<<std::endl;
+    Eigen::VectorXi B;
+    B.setZero(V.rows());
+    for(int i=0;i<bi.rows();i++)
+      B(bi(i)) = 1;
     // [init Dirichlet energy]
     std::cout<<"init dirichlet energy ... "<<std::endl;
     Eigen::VectorXd Energy;
     std::vector<int> FL(F.rows());
     std::iota(FL.begin(),FL.end(),0);
-    compute_dirichlet_energy(avg,uv,F,FL,4,Energy);
+    compute_dirichlet_energy(avg,uv,F,FL,eps,Energy);
     std::cout<<"done"<<std::endl;
 
     // [collect invalid elements]
     std::cout<<"collect invalid elements"<<std::endl;
-    Eigen::VectorXi I(F.rows());
-    count_flipped_element(V,F,I);
+    Eigen::VectorXi I;
+    I.setZero(F.rows());
+    std::vector<int> S;
+    test_flip(uv, F, S);
+    count_flipped_element(uv,F,I);
+    std::cout<<"flipped: "<<I.sum()<<std::endl;
     for(int i=0;i<F.rows();i++){
       if(I(i)) continue;
-      if(!std::isfinite(Energy(i))||Energy(i)>1e20)
+      if(!std::isfinite(Energy(i))||Energy(i)>eps){
         I(i) = 1;
+        std::cout<<area(i)<<std::endl;
+      }
     }
+    std::cout<<"invalid: "<<I.sum()<<std::endl;
     std::cout<<"done"<<std::endl;
 
-    std::vector<int> S;
+    //std::vector<int> S;
+    S.clear();
     for(int i=0;i<I.rows();i++){
       if(I(i)) S.push_back(i);
     }
@@ -400,20 +850,42 @@ bool progressive_fix(
         //     cF.row(i++)<<F.row(s);
         test_flip(uv, F, S);
         flipped = S.size();
-        compute_dirichlet_energy(avg,uv,F,FL,1e20,Energy);
+        compute_dirichlet_energy(avg,uv,F,FL,eps,Energy);
         int valid_face = 0;
         for(int i=0;i<F.rows();i++){
             if(F.row(i).sum() == 0) continue;
             valid_face++;
-            if(!std::isfinite(Energy(i)) || Energy(i)>1e20){
+            if(!std::isfinite(Energy(i)) || Energy(i)>eps){
                 if(std::find(S.begin(),S.end(),i) == S.end()){
                     // std::cout<<Energy(i)<<std::endl;
                     S.push_back(i);
                 }
             }
         }
-        if(!do_collapse)
-            neighbor++;
+        if(!do_collapse){
+          Eigen::MatrixXi FF,FFI; // adjacency map
+          igl::triangle_triangle_adjacency(F,FF,FFI);
+          std::cout<<"move to barycenter"<<std::endl;
+          int n = 0;
+          for(int fid: S){
+            std::cout<<n++<<"/"<<S.size()<<std::endl;
+            Eigen::MatrixXi local_F;
+            int interior_id=expand_to_boundary(V,F,B,FF,fid,local_F);
+            //igl::opengl::glfw::Viewer vr;
+            Eigen::RowVector2d the_center;
+            for(int i=0;i<local_F.rows();i++){
+              if(local_F.row(i).sum()!=0){
+                Eigen::RowVector2d barycenter = (uv.row(local_F(i,0)) + uv.row(local_F(i,1)) + uv.row(local_F(i,2))) / 3;
+                the_center += barycenter;
+              }
+            }
+            the_center /= local_F.rows();
+            uv.row(interior_id) << the_center;
+            break;
+            //plot_mesh(vr,uv,local_F,{});
+          }
+          neighbor++;
+        }
         else
             neighbor = 0;
         invalid_size = S.size();
@@ -425,7 +897,6 @@ bool progressive_fix(
         igl::triangle_triangle_adjacency(F,FF,FFI);
         Eigen::MatrixXi region;
         for(int i=0;i<S.size() && neighbor!=0;i++){
-
             Eigen::VectorXi nbs;
             get_neighbor_at_level(uv,F,FF,S[i],neighbor,nbs,region);
             //S_aux.insert(S[i]);
@@ -447,41 +918,9 @@ bool progressive_fix(
         if((valid_face == invalid_size || !do_collapse) && flipped == 0)
             invalid_size = 0;
     }
+    std::cout<<"L.size() is "<<L.size()<<std::endl;
+    
     std::reverse(L.begin(),L.end());
-    // display the collapsed faces in original model
-    // igl::opengl::glfw::Viewer vr;
-    // vr.data().set_mesh(uv,F);
-    // vr.launch();
-    std::set<int> highlight;
-    std::vector<int> hvec;
-    for(int i=0;i<L.size();i++){
-        auto nbi = std::get<3>(L[i]);
-        for(int j=0;j<nbi.rows();j++){
-            highlight.insert(nbi(j));
-            for(int k=0;k<3;k++)
-                hvec.push_back(F_original(nbi(j),k));
-        }
-    }
-    std::vector<int> highlight_vec(highlight.begin(),highlight.end());
-    Eigen::VectorXi bdri;
-    igl::boundary_loop(F_original,bdri);
-    std::vector<std::pair<int,int>> bdr_v0;
-    for(int i=0;i<bdri.rows();i++){
-        bdr_v0.push_back(std::make_pair(bdri(i),bdri((i+1)%bdri.rows())));
-    }
-    Eigen::VectorXd areas;
-    Eigen::MatrixXi F_solid = F;
-    int c = 0;
-    for(int k=0;k<F.rows();k++){
-        if(F.row(k).sum()==0) continue;
-        F_solid.row(c++)<<F.row(k);
-    }
-    F_solid.conservativeResize(c,3);
-    igl::doublearea(uv,F_solid,areas);
-    double min_area = areas.minCoeff();
-    std::cout<<"area range is "<<areas.minCoeff()<<","<<areas.maxCoeff()<<std::endl;
-    //display(uv_original,F_original,{},hvec,highlight_vec,{});
-    //display(uv,F,{},{},{},{});
     // for every action in the list
     bool rollback = false;
     int degree = 2;
@@ -535,7 +974,7 @@ bool progressive_fix(
         for(int j=0;j<cd.rows();j++){
             Eigen::RowVector2d y;
             std::pair<bool,double> z;
-            z = flip_avoid_line_search(V,uv,ring,bdr_s,v0,v1,cd.row(j),y,avg);
+            z = flip_avoid_line_search(V,uv,ring,v0,v1,cd.row(j),y,avg);
             //std::cout<<"position "<<j<<": "<<std::get<0>(z)<<","<<std::get<1>(z)<<std::endl;
             int count = 0;
             if(std::get<0>(z) == true && std::get<1>(z)<maxenergy){
@@ -678,4 +1117,3 @@ bool progressive_fix(
     //        << stat_progressive_time <<"\n";
     return true;
 }
-template double doublearea<Eigen::Matrix<double, -1, -1, 0, -1, -1> >(Eigen::MatrixBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> > const&);

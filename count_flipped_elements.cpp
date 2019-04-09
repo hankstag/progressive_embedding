@@ -44,7 +44,7 @@ void count_flipped_element(
   const Eigen::MatrixXi& F,
   Eigen::VectorXi& I
 ){
-  assert(I.rows() == F.rows());
+  I.setZero(F.rows());
   for(int i=0;i<F.rows();i++){
     if(F.row(i).minCoeff()<0) continue;
     double a[2] = {V(F(i,0),0),V(F(i,0),1)};

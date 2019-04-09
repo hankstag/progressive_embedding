@@ -541,7 +541,7 @@ void match_maker(
                 if(on_path.find(t) != on_path.end()) continue;
                 if(on_path_v.find(F_vec[i][k])!=on_path_v.end() &&
                    on_path_v.find(F_vec[i][(k+1)%3])!=on_path_v.end()){
-                    bool status = edge_split(V_vec,F_vec,V,F,TT_vec,TTi_vec,i,k);
+                    bool status = edge_split(V_vec,F_vec,TT_vec,TTi_vec,i,k);
                     assert(status!=false && "split boundary");
                 }
             }

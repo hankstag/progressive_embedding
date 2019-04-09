@@ -4,8 +4,6 @@
 bool edge_split(
     std::vector<std::vector<double>>& V0,
     std::vector<std::vector<int>>& F0,
-    Eigen::MatrixXd& V,
-    Eigen::MatrixXi& F,
     std::vector<std::vector<int>>& FF_vec,
     std::vector<std::vector<int>>& FFi_vec,
     int f0,
