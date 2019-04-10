@@ -40,7 +40,7 @@ bool is_face_flipped(const Eigen::Matrix<double,3,2>& T){
   double a[2] = {T(0,0),T(0,1)};
   double b[2] = {T(1,0),T(1,1)};
   double c[2] = {T(2,0),T(2,1)};
-  return igl::copyleft::cgal::orient2D(a,b,c) < 0;
+  return igl::copyleft::cgal::orient2D(a,b,c) <= 0;
 }
 
 bool is_face_valid(
@@ -50,7 +50,7 @@ bool is_face_valid(
 ){
   bool flipped = is_face_flipped(T);
   double e = autogen::sd_energy(T,G_t);
-  return e < threshold && !flipped;
+  return std::isfinite(e) && (e < threshold) && !flipped;
 }
 
 
@@ -322,7 +322,7 @@ void collect_invalid_elements(
   Eigen::VectorXd Energy;
   std::vector<int> FL(F.rows());
   std::iota(FL.begin(),FL.end(),0);
-  compute_dirichlet_energy(avg,uv,F,FL,eps,Energy);
+  compute_dirichlet_energy(avg,uv,F,FL,0,Energy);
   std::cout<<"done"<<std::endl;
   
   // [collect invalid elements]
@@ -361,6 +361,8 @@ void collapse_invalid_elements(
   int valid_faces = 0;
   while(invalid_size!=0){
     bool do_collapse = false;
+    Eigen::VectorXi updated(F.rows());
+    updated.setZero();
     for(int f=0;f<I.rows();f++){
       if(I(f)==0) continue;
       for(int k=0;k<3;k++){
@@ -387,12 +389,33 @@ void collapse_invalid_elements(
           L.push_back(Action(std::max(a,b),std::min(a,b),F_store,nbi,false));
           collapse_edge(e,pt,uv,F,dEF,dEI,EE,allE,{});
           do_collapse = true;
-
+          for(int n: N){
+            updated(n) = 1;
+            //Eigen::Matrix<double,3,2> T;
+            //if(F.row(n).sum()!=0){
+            //  T<<uv.row(F(n,0)),uv.row(F(n,1)),uv.row(F(n,2));
+            //  bool valid = is_face_valid(G,T,eps);
+            //  updated(n) = valid ? 0 : 1;
+            //}
+          }
         }
       }
     }
         // recollect invalid elements
-        collect_invalid_elements(V,F,uv,eps,avg,I);
+        Eigen::VectorXi I0 = I;
+        for(int i=0;i<I.rows();i++){
+          if(updated(i)){
+            if(F.row(i).sum() == 0)
+              I0(i) = 0;
+            else{
+              Eigen::Matrix<double,3,2> T;
+              T<<uv.row(F(i,0)),uv.row(F(i,1)),uv.row(F(i,2));
+              I0(i) = !is_face_valid(G,T,eps);
+            }
+          }
+        }
+        I = I0;
+        //if((I0-I).norm()!=0) std::cout<<(I0-I).norm()<<std::endl;
         if(!do_collapse)
           neighbor++;
         else
