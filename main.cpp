@@ -1,8 +1,9 @@
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/matrix_to_list.h>
-
+#include <igl/serialize.h>
 #include "matchmaker.h"
 #include "target_polygon.h"
+#include "progressive_embedding.h"
 #include "plot.h"
 #include "loader.h"
 #include "argh.h"
@@ -96,6 +97,16 @@ int main(int argc, char *argv[])
 
   Eigen::VectorXi ci;
   Eigen::MatrixXd c;
+  
+  std::string serial_name = "local_save_pb";
+  igl::deserialize(V,"V",serial_name);
+  igl::deserialize(uv,"uv",serial_name);
+  igl::deserialize(F,"F",serial_name);
+  igl::deserialize(ci,"bi",serial_name);
+  igl::deserialize(c,"b",serial_name);
+  progressive_embedding(V,F,uv,ci,c,1e100);
+
+
   match_maker(V,F,uv,c,ci,R,bd0,polygon);
   #endif
   igl::opengl::glfw::Viewer vr;

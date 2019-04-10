@@ -21,6 +21,38 @@
 #include "local_smooth/auto_grad.hpp"
 #define LOG
 
+// given a target area for reference shape
+// compute the gradient operator
+void compute_gradient(
+  double target_area,
+  Eigen::Matrix<double,2,3>& G_t
+){
+  double h = std::sqrt( target_area/sin(M_PI / 3.0));
+  Eigen::Matrix<double,3,3> Tx;
+  Tx<<0,0,0,h,0,0,h/2.,(std::sqrt(3)/2.)*h,0;
+  Eigen::Matrix<double,3,3> gx;
+  grad_operator(Tx,gx);
+  G_t.resize(3,2);
+  G_t = gx.topRows(2);
+}
+
+bool is_face_flipped(const Eigen::Matrix<double,3,2>& T){
+  double a[2] = {T(0,0),T(0,1)};
+  double b[2] = {T(1,0),T(1,1)};
+  double c[2] = {T(2,0),T(2,1)};
+  return igl::copyleft::cgal::orient2D(a,b,c) < 0;
+}
+
+bool is_face_valid(
+  const Eigen::Matrix<double,2,3>& G_t,
+  const Eigen::Matrix<double,3,2>& T,
+  const double threshold
+){
+  bool flipped = is_face_flipped(T);
+  double e = autogen::sd_energy(T,G_t);
+  return e < threshold && !flipped;
+}
+
 int expand_to_boundary(
   const Eigen::MatrixXd& V,
   const Eigen::MatrixXi& F,
@@ -228,12 +260,8 @@ std::pair<bool,double> flip_avoid_line_search(
         }
     }
     std::vector<double> one_ring_chosen;
-    double h = std::sqrt( target_area/sin(M_PI / 3.0));
-    Eigen::Matrix<double,3,3> Tx;
-    Tx<<0,0,0,h,0,0,h/2.,(std::sqrt(3)/2.)*h,0;
-    Eigen::Matrix<double,3,3> gx;
-    grad_operator(Tx,gx);
-    Eigen::Matrix<double,2,3> G_t = gx.topRows(2);
+    Eigen::Matrix<double,2,3> G_t;
+    compute_gradient(target_area,G_t);
     
     for(int it = 0;it<MAX_IT;it++){
         Eigen::RowVector2d pt;
@@ -303,123 +331,6 @@ void collect_invalid_elements(
     if(I(i) || F.row(i).sum()==0) continue;
     if(!std::isfinite(Energy(i))||Energy(i)>eps)
       I(i) = 1;
-  }
-}
-
-void collapsing_invalid_elements_n(
-  const Eigen::MatrixXd& V,
-  Eigen::MatrixXi& F,
-  Eigen::MatrixXd& uv,
-  Eigen::VectorXi& I, //invalid
-  const Eigen::VectorXi& B, //boundary
-  const double eps,
-  const double avg,
-  std::vector<Action>& L
-){
-  std::vector<int> FL(F.rows());
-  std::iota(FL.begin(),FL.end(),0);
-  Eigen::VectorXi EMAP,EE;
-  Eigen::MatrixXi E,EF,EI;
-  Eigen::MatrixXi dEF,dEI,allE;
-  igl::edge_flaps(F,E,allE,EMAP,EF,EI,dEF,dEI,EE);
-  
-  auto collapse_single_edge = [&](
-    Eigen::MatrixXd& uv,
-    Eigen::MatrixXi& F,
-    const int f,
-    const int k,
-    std::vector<Action>& L
-  ){
-    int e = F.rows()*((k+2)%3)+f;
-    int a = F(f,k), b = F(f,(k+1)%3);
-    std::vector<int> N; // 1-ring neighbor
-    if(edge_collapse_is_valid(e,uv.row(b),uv,F,dEF,dEI,EE,allE,N)){
-      std::sort(N.begin(), N.end());
-      N.erase( std::unique( N.begin(), N.end() ), N.end() );
-      Eigen::VectorXi nbi;
-      igl::list_to_matrix(N,nbi);
-      Eigen::MatrixXd nb(N.size()*3,2);
-      Eigen::MatrixXi F_store(nbi.rows(),3);
-      // collect all the positions beside a and b
-      int fn = 0;
-      for(int fi: N){
-          if(F.row(fi).sum()==0) continue;
-          F_store.row(fn++)<<F.row(fi);
-      }
-      F_store.conservativeResize(fn,3);
-      Eigen::RowVector2d pt;
-      if(a>b) std::swap(a,b);
-      pt = uv.row(a);
-      L.push_back(Action(b,a,F_store,nbi,false));
-      collapse_edge(e,pt,uv,F,dEF,dEI,EE,allE,{});
-      return true;
-    }else 
-      return false;
-  };
-  const int MAX_LAYER = 5;
-  int layer = 0;
-  while(I.sum()!=0){
-    bool collapsed = false;
-    for(int f=0;f<I.rows();f++){
-      if(I(f)==0) continue;
-      for(int k=0;k<3;k++){
-          int e = F.rows()*((k+2)%3)+f;
-          int a = F(f,k), b = F(f,(k+1)%3);
-          if(B(a) || B(b)) continue;
-          collapsed = (collapsed || collapse_single_edge(uv,F,f,k,L));
-      }
-    }
-    Eigen::MatrixXi FF,FFi;
-    igl::triangle_triangle_adjacency(F,FF,FFi);
-    if(layer > MAX_LAYER){
-      for(int i=0;i<I.rows();i++){
-        Eigen::MatrixXi local_F;
-        if(I(i)){
-          int interior_id = expand_to_boundary(V,F,I,FF,i,local_F);
-          Eigen::VectorXi local_bd;
-          Eigen::RowVector2d the_center;
-          igl::boundary_loop(local_F,local_bd);
-          for(int i=0;i<local_bd.rows();i++){
-            the_center += uv.row(local_bd(i));
-          }
-          the_center /= local_bd.rows();
-          uv.row(interior_id) << the_center;
-          std::cout<<"move "<<interior_id<<std::endl;
-          std::cout<<"to "<<the_center<<std::endl;;
-          Eigen::VectorXi III;
-          count_flipped_element(uv,local_F,III);
-          std::cout<<"flip in this region: "<<III.sum()<<std::endl;
-          if(III.sum()!=0){
-            Eigen::VectorXi II;
-            Eigen::MatrixXd NV,NV3;
-            Eigen::MatrixXi NF,CN,FN;
-            igl::remove_unreferenced(uv,local_F,NV,NF,II);
-            igl::remove_unreferenced(V,local_F,NV3,NF,II);
-            igl::opengl::glfw::Viewer vr;
-            plot_mesh(vr,NV,NF,{},true);
-            igl::writeOBJ("small_region.obj",NV3,NF,CN,FN,NV,NF);
-            exit(0);
-          }
-        }
-      }
-    }
-    // recollect invalid elements
-    collect_invalid_elements(V,F,uv,eps,avg,I);
-    // if nothing collpsed
-    // mark k-ring neighbor as invalid and try again
-    if(!collapsed){
-      for(int i=0;i<I.rows();i++){
-        if(I(i)==1){
-          Eigen::VectorXi RF; // neighbor face ids
-          Eigen::MatrixXi region;
-          get_neighbor_at_level(uv,F,FF,i,layer,RF,region);
-          for(int f=0;f<RF.rows();f++)
-            I(f) = 1;
-        }
-      }
-      layer++;
-    }else
-      layer = 0;
   }
 }
 

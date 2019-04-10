@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
   Eigen::VectorXi T,R,bd;
   load_model(model,V,uv,F,polygon,R,T);
   
-  #define FIXING
+  //#define FIXING
   #ifndef FIXING
   F.conservativeResize(F.rows()-1,3);
   igl::boundary_loop(F,bd);
