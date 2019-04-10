@@ -1,17 +1,24 @@
-#ifndef PROGRESSIVE_TUTTE
-#define PROGRESSIVE_TUTTE
+#ifndef PROGRESSIVE_EMBEDDING
+#define PROGRESSIVE_EMBEDDING
 
-#include <igl/harmonic.h>
+#include <Eigen/Core>
+
+bool progressive_embedding(
+  const Eigen::MatrixXd& V,
+  Eigen::MatrixXi& F,
+  Eigen::MatrixXd& uv,
+  const Eigen::VectorXi& bi,
+  const Eigen::MatrixXd& b,
+  double eps
+);
+
 bool progressive_fix(
-    const Eigen::VectorXi& c,
+    const Eigen::VectorXi& cs,
     Eigen::VectorXi& bi,
     Eigen::MatrixXd& b,
     const Eigen::MatrixXd& V,
     Eigen::MatrixXi& F,
     Eigen::MatrixXd& uv
 );
-
-template <typename DerivedT>
-double doublearea(const Eigen::MatrixBase<DerivedT>& T);
 
 #endif

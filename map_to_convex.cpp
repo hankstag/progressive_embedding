@@ -2,7 +2,9 @@
 #include <igl/matrix_to_list.h>
 #include <igl/boundary_loop.h>
 #include <igl/map_vertices_to_circle.h>
+#include <igl/harmonic.h>
 #include "progressive_embedding.h"
+#include "count_flipped_elements.h"
 #include "plot.h"
 #include "loader.h"
 #include "argh.h"
@@ -29,16 +31,27 @@ int main(int argc, char *argv[])
   Eigen::VectorXi T,R,bd;
   load_model(model,V,uv,F,polygon,R,T);
   
+  #define FIXING
+  #ifndef FIXING
   F.conservativeResize(F.rows()-1,3);
   igl::boundary_loop(F,bd);
   Eigen::MatrixXd circle;
   igl::map_vertices_to_circle(V,bd,circle);
   Eigen::MatrixXd H;
   igl::harmonic(F,bd,circle,1,H);
-  Eigen::VectorXi ci;
-  progressive_fix(ci,bd,circle,V,F,H);
+  progressive_embedding(V,F,H,bd,circle,1e20);
+  #else 
+  Eigen::VectorXi b;
+  Eigen::MatrixXd bc;
+  igl::boundary_loop(F,b);
+  igl::slice(uv,b,1,bc);
+  Eigen::VectorXi I;
+  count_flipped_element(uv,F,I);
+  std::cout<<"count flipped: "<<I.sum()<<std::endl;
+  bool x = progressive_embedding(V,F,uv,b,bc,1e20);
+  #endif
 
   igl::opengl::glfw::Viewer vr;
-  plot_mesh(vr,H,F,{});
+  plot_mesh(vr,uv,F,{});
 
 }
