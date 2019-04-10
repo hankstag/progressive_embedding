@@ -116,7 +116,7 @@ int expand_to_boundary(
 void get_neighbor_at_level(
     const Eigen::MatrixXd& V,
     const Eigen::MatrixXi& F,
-    const Eigen::MatrixXi& FF,
+    const Eigen::MatrixXi& dEF,
     int fid,
     int neighbor,
     Eigen::VectorXi& nbs,
@@ -138,10 +138,11 @@ void get_neighbor_at_level(
             if(l == neighbor) break;
             Q.pop_front();
             for(int i=0;i<3;i++){
-                if(FF(f,i)!=-1 && N.find(FF(f,i))==N.end()){
-                    std::pair<int,int> p(FF(f,i),l+1);
+              int e = F.rows()*((i+2)%3)+f;
+              if(dEF(e,1)!=-1 && N.find(dEF(e,1))==N.end()){
+                    std::pair<int,int> p(dEF(e,1),l+1);
                     Q.push_back(p);
-                    N.insert(FF(f,i));
+                    N.insert(dEF(e,1));
                 }
             }
         }
@@ -307,7 +308,6 @@ std::pair<bool,double> flip_avoid_line_search(
 }
 
 using Action = std::tuple<int,int,Eigen::MatrixXi,Eigen::VectorXi,bool>;
-using Edge_info = std::tuple<double,int>;
 
 void collect_invalid_elements(
   const Eigen::MatrixXd& V,
@@ -391,35 +391,26 @@ void collapse_invalid_elements(
           do_collapse = true;
           for(int n: N){
             updated(n) = 1;
-            //Eigen::Matrix<double,3,2> T;
-            //if(F.row(n).sum()!=0){
-            //  T<<uv.row(F(n,0)),uv.row(F(n,1)),uv.row(F(n,2));
-            //  bool valid = is_face_valid(G,T,eps);
-            //  updated(n) = valid ? 0 : 1;
-            //}
           }
         }
       }
     }
-        // recollect invalid elements
-        Eigen::VectorXi I0 = I;
-        for(int i=0;i<I.rows();i++){
-          if(updated(i)){
-            if(F.row(i).sum() == 0)
-              I0(i) = 0;
-            else{
-              Eigen::Matrix<double,3,2> T;
-              T<<uv.row(F(i,0)),uv.row(F(i,1)),uv.row(F(i,2));
-              I0(i) = !is_face_valid(G,T,eps);
-            }
-          }
+
+    // remark invalid elements
+    for(int i=0;i<I.rows();i++){
+      if(updated(i)){
+        if(F.row(i).sum() == 0)
+          I(i) = 0;
+        else{
+          Eigen::Matrix<double,3,2> T;
+          T<<uv.row(F(i,0)),uv.row(F(i,1)),uv.row(F(i,2));
+          I(i) = !is_face_valid(G,T,eps);
         }
-        I = I0;
-        //if((I0-I).norm()!=0) std::cout<<(I0-I).norm()<<std::endl;
-        if(!do_collapse)
-          neighbor++;
-        else
-          neighbor = 0;
+      }
+    }
+
+    // expand to 1-ring neighbor if all collapse failed
+    neighbor = do_collapse ? 0 : neighbor+1;
         if(neighbor == 5){
           Eigen::MatrixXi FF,FFI; // adjacency map
           igl::triangle_triangle_adjacency(F,FF,FFI);
@@ -468,13 +459,13 @@ void collapse_invalid_elements(
         std::cout<<"neighbor layer "<<neighbor<<std::endl;
         // also collapse its level-k neighbors
         std::set<int> S_aux;
-        Eigen::MatrixXi FF,FFI; // adjacency map
-        igl::triangle_triangle_adjacency(F,FF,FFI);
+        // Eigen::MatrixXi FF,FFI; // adjacency map
+        // igl::triangle_triangle_adjacency(F,FF,FFI);
         Eigen::MatrixXi region;
         for(int i=0;i<I.rows() && neighbor!=0;i++){
             if(I(i)==0) continue;
             Eigen::VectorXi nbs;
-            get_neighbor_at_level(uv,F,FF,i,neighbor,nbs,region);
+            get_neighbor_at_level(uv,F,dEF,i,neighbor,nbs,region);
             //S_aux.insert(S[i]);
             for(int j=0;j<nbs.rows();j++)
                 S_aux.insert(nbs(j));   
