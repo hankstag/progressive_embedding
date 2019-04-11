@@ -2,6 +2,7 @@
 #define COUNT_FLIPPED_ELEMENTS
 
 #include <Eigen/Core>
+#include <vector>
 
 void test_flip(
   const Eigen::MatrixXd& V, 

@@ -1,5 +1,4 @@
 #include "edge_split.h"
-#include <vector>
 
 bool edge_split(
     std::vector<std::vector<double>>& V0,

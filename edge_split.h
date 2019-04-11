@@ -2,6 +2,7 @@
 #define EDGE_SPLIT
 
 #include <Eigen/Core>
+#include <vector>
 
 bool edge_split(
     std::vector<std::vector<double>>& V0,
