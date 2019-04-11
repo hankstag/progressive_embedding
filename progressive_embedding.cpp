@@ -533,7 +533,7 @@ bool insert_vertex_back(
             Eigen::RowVector2d y;
             std::pair<bool,double> z;
             z = flip_avoid_line_search(V,uv,ring,v0,v1,cd.row(j),y,avg);
-            //std::cout<<"position "<<j<<": "<<std::get<0>(z)<<","<<std::get<1>(z)<<std::endl;
+            std::cout<<"position "<<j<<": "<<std::get<0>(z)<<","<<std::get<1>(z)<<std::endl;
             int count = 0;
             if(std::get<0>(z) == true && std::get<1>(z)<maxenergy){
                 found = true;
@@ -542,18 +542,18 @@ bool insert_vertex_back(
             }
         }
 
-        if(ii%20 == 0){
-            // serialization
-            // - F
-            // - uv
-            // - ii
-            // model_name + eps + progressive_bin
-            std::string serial_name = "carter100";
-            igl::serialize(ii,"ii",serial_name,true);
-            igl::serialize(uv,"uv",serial_name);
-            igl::serialize(F,"F",serial_name);
-            std::cout<<"searialize "<<ii<<std::endl;
-        }
+        // if(ii%200 == 0){
+        //     // serialization
+        //     // - F
+        //     // - uv
+        //     // - ii
+        //     // model_name + eps + progressive_bin
+        //     std::string serial_name = "carter100";
+        //     igl::serialize(ii,"ii",serial_name,true);
+        //     igl::serialize(uv,"uv",serial_name);
+        //     igl::serialize(F,"F",serial_name);
+        //     std::cout<<"searialize "<<ii<<std::endl;
+        // }
 
         if(found){
             auto F_t = F;
@@ -565,7 +565,7 @@ bool insert_vertex_back(
             F_t.conservativeResize(d,3);
             std::cout<<"current face size "<<d<<"/"<<F.rows()<<std::endl;
             uv.row(v1) << pos;
-            local_smoothing(V,F_t,B,uv,10,1e10);
+            local_smoothing(V,F_t,B,uv,10,avg,1e10);
         }else{
             F = F_store;
             uv = uv_store;
@@ -623,7 +623,7 @@ bool insert_vertex_back(
             }
             F_t.conservativeResize(d,3);
             auto uv_o = uv;
-            local_smoothing(V,F_t,B,uv,100,1e10);
+            local_smoothing(V,F_t,B,uv,100,avg,1e10);
             ii--;
         }
         double time2 = timer.getElapsedTime();

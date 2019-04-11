@@ -9,43 +9,43 @@
 #include "argh.h"
 #include "local_smooth/local_smooth.h"
 
-void test_local_smoothing(){
-  Eigen::MatrixXi F(13,3);
-  F<<0,1,2,
-     3,2,1,
-     2,4,5,
-     6,7,2,
-     8,6,9,
-     10,9,2,
-     2,11,0,
-     10,2,12,
-     12,2,5,
-     2,3,4,
-     2,7,11,
-     9,6,2,
-     8,7,6;
-  Eigen::MatrixXd V(13,2);
-  V<<                -39,            -9.8125,
-                -39,              -9.75,
--39.000000000000007,-9.9365594558871901,
-                -39,            -9.6875,
- -39.00001456174526,-9.9732687460454432,
-                -39,-10.421052631578947,
--39.000000000000007,-9.9365594558871901,
-                -39,            -9.9375,
-                -39,                -10,
-                -39,-10.105263157894736,
-                -39,-10.210526315789474,
-                -39,             -9.875,
-                -39,-10.315789473684211;
-  double target_area = 0.432473;
-  Eigen::VectorXi B(V.rows());
-  Eigen::MatrixXd V0 = V;
-  local_smoothing(V,F,B,V,10,1e10);
-  std::cout<<"diff: "<<(V-V0).norm()<<std::endl;
-  std::cout<<V<<std::endl;
+// void test_local_smoothing(){
+//   Eigen::MatrixXi F(13,3);
+//   F<<0,1,2,
+//      3,2,1,
+//      2,4,5,
+//      6,7,2,
+//      8,6,9,
+//      10,9,2,
+//      2,11,0,
+//      10,2,12,
+//      12,2,5,
+//      2,3,4,
+//      2,7,11,
+//      9,6,2,
+//      8,7,6;
+//   Eigen::MatrixXd V(13,2);
+//   V<<                -39,            -9.8125,
+//                 -39,              -9.75,
+// -39.000000000000007,-9.9365594558871901,
+//                 -39,            -9.6875,
+//  -39.00001456174526,-9.9732687460454432,
+//                 -39,-10.421052631578947,
+// -39.000000000000007,-9.9365594558871901,
+//                 -39,            -9.9375,
+//                 -39,                -10,
+//                 -39,-10.105263157894736,
+//                 -39,-10.210526315789474,
+//                 -39,             -9.875,
+//                 -39,-10.315789473684211;
+//   double target_area = 0.432473;
+//   Eigen::VectorXi B(V.rows());
+//   Eigen::MatrixXd V0 = V;
+//   local_smoothing(V,F,B,V,10,1e10);
+//   std::cout<<"diff: "<<(V-V0).norm()<<std::endl;
+//   std::cout<<V<<std::endl;
 
-}
+// }
 
 void random_internal_vertices(
   const Eigen::MatrixXd& V,
@@ -85,7 +85,6 @@ int main(int argc, char *argv[])
       std::cout<<"-b: whether use the boundary info in obj file"<<std::endl;
       exit(0);
   }
-  test_local_smoothing();
   int loop, threshold;
   std::string model,uvfile;
   cmdl("-in") >> model;
@@ -137,7 +136,7 @@ int main(int argc, char *argv[])
   Eigen::VectorXi ci;
   Eigen::MatrixXd c;
   
-  //#define SHORTCUT
+  #define SHORTCUT
   #ifdef SHORTCUT
   std::string serial_name = "carter_save_pb";
   igl::deserialize(V,"V",serial_name);
