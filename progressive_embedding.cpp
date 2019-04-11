@@ -58,36 +58,38 @@ bool is_face_valid(
 int expand_to_boundary(
   const Eigen::MatrixXd& V,
   const Eigen::MatrixXi& F,
-  const Eigen::VectorXi& I,
-  const Eigen::MatrixXi& FF_s,
+  const Eigen::VectorXi& B,
+  const Eigen::MatrixXi& dEF_s,
   const int fid,
   Eigen::MatrixXi& local_F
 ){
-  Eigen::MatrixXi FF = FF_s;
+  Eigen::MatrixXi dEF = dEF_s;
   std::set<int> N;
   std::deque<int> Q;
   N.clear();
   int level = 0;
-  for(int i=0;i<FF.rows();i++){
+  for(int i=0;i<F.rows();i++){
     for(int k=0;k<3;k++){
-      int k_1 = (k+1) % 3;
-      if(I(F(i,k)) && I(F(i,k_1)))
-        FF(i,k) = -1;
+      int e = F.rows()*((k+2)%3)+i;
+      int k_1 = (k+1)%3;
+      if(B(F(i,k)) && B(F(i,k_1)))
+        dEF(e,1) = -1;
     }
   }
   if(fid != -1){
-      Q.push_back(fid);
-      N.insert(fid);
-      while(!Q.empty()){
-          int f = Q.front();
-          Q.pop_front();
-          for(int i=0;i<3;i++){
-            if(FF(f,i)!=-1 && N.find(FF(f,i))==N.end()){
-              Q.push_back(FF(f,i));
-              N.insert(FF(f,i));
-            }
-          }
+    Q.push_back(fid);
+    N.insert(fid);
+    while(!Q.empty()){
+      int f = Q.front();
+      Q.pop_front();
+      for(int i=0;i<3;i++){
+        int e = F.rows()*((i+2)%3)+f;
+        if(dEF(e,1)!=-1 && N.find(dEF(e,1))==N.end()){
+          Q.push_back(dEF(e,1));
+          N.insert(dEF(e,1));
+        }
       }
+    }
   }
   Q.clear();
   local_F.resize(N.size(),3);
@@ -102,7 +104,7 @@ int expand_to_boundary(
   for(int i=0;i<local_F.rows();i++){
     for(int k=0;k<3;k++){
       int id = local_F(i,k);
-      if(!I(id)){
+      if(!B(id)){
         my_id = id;
         interior.insert(my_id);
         //std::cout<<my_id<<std::endl;
@@ -143,7 +145,7 @@ void get_neighbor_at_level(
                     std::pair<int,int> p(dEF(e,1),l+1);
                     Q.push_back(p);
                     N.insert(dEF(e,1));
-                }
+              }
             }
         }
     }
@@ -357,7 +359,8 @@ void collapse_invalid_elements(
   compute_gradient(avg,G);
 
   int invalid_size = I.sum();
-  int neighbor = 0;
+  const int MAX_LAYER = 5;
+  int layer = 0;
   int valid_faces = 0;
   while(invalid_size!=0){
     bool do_collapse = false;
@@ -371,8 +374,8 @@ void collapse_invalid_elements(
         if(B(a) == 1 || B(b) == 1) continue;
         std::vector<int> N; // 1-ring neighbor
         if(edge_collapse_is_valid(e,uv.row(b),uv,F,dEF,dEI,EE,allE,N)){
-          std::sort(N.begin(), N.end());
-          N.erase( std::unique( N.begin(), N.end() ), N.end() );
+          std::sort(N.begin(),N.end());
+          N.erase( std::unique(N.begin(), N.end()), N.end() );
           Eigen::VectorXi nbi;
           igl::list_to_matrix(N,nbi);
           Eigen::MatrixXd nb(N.size()*3,2);
@@ -396,7 +399,8 @@ void collapse_invalid_elements(
       }
     }
 
-    // remark invalid elements
+    // for updated elements
+    // update validity status
     for(int i=0;i<I.rows();i++){
       if(updated(i)){
         if(F.row(i).sum() == 0)
@@ -410,62 +414,42 @@ void collapse_invalid_elements(
     }
 
     // expand to 1-ring neighbor if all collapse failed
-    neighbor = do_collapse ? 0 : neighbor+1;
-        if(neighbor == 5){
-          Eigen::MatrixXi FF,FFI; // adjacency map
-          igl::triangle_triangle_adjacency(F,FF,FFI);
-          std::cout<<"move to barycenter"<<std::endl;
-          int n = 0;
-          for(int i=0;i<I.rows();i++){
-            if(I(i) == 0) continue;
-            std::cout<<n++<<"/"<<I.sum()<<std::endl;
-            Eigen::MatrixXi local_F;
-            int interior_id=expand_to_boundary(V,F,B,FF,i,local_F);
-            //exit(0);
-            if(interior_id==-1) continue;
-            //plot_mesh(vr,uv,local_F,{});
-            Eigen::RowVector2d the_center;
-            the_center.setZero();
-            Eigen::VectorXi local_bd;
-            igl::boundary_loop(local_F,local_bd);
-            for(int i=0;i<local_bd.rows();i++){
-              the_center += uv.row(local_bd(i));
-            }
-            the_center /= local_bd.rows();
-            uv.row(interior_id) << the_center;
-            std::cout<<"move "<<interior_id<<std::endl;
-            std::cout<<"to "<<the_center<<std::endl;;
-            Eigen::VectorXi III;
-            count_flipped_element(uv,local_F,III);
-            std::cout<<"flip in this region: "<<III.sum()<<std::endl;
-            if(III.sum()!=0){
-              Eigen::VectorXi II;
-              Eigen::MatrixXd NV,NV3;
-              Eigen::MatrixXi NF,CN,FN;
-              igl::remove_unreferenced(uv,local_F,NV,NF,II);
-              igl::remove_unreferenced(V,local_F,NV3,NF,II);
-              igl::opengl::glfw::Viewer vr;
-              plot_mesh(vr,NV,NF,{},true);
-              igl::writeOBJ("small_region.obj",NV3,NF,CN,FN,NV,NF);
-              exit(0);
-            }
-            collect_invalid_elements(V,F,uv,eps,avg,I);
-            break;
-          }
+    layer = do_collapse ? 0 : layer+1;
+    if(layer == MAX_LAYER){
+      std::cout<<"move to barycenter"<<std::endl;
+      int n = 0;
+      for(int i=0;i<I.rows();i++){
+        if(I(i) == 0) continue;
+        std::cout<<n++<<"/"<<I.sum()<<std::endl;
+        Eigen::MatrixXi local_F;
+        int interior_id=expand_to_boundary(V,F,B,dEF,i,local_F);
+        //exit(0);
+        if(interior_id==-1) continue;
+        //plot_mesh(vr,uv,local_F,{});
+        Eigen::RowVector2d the_center;
+        the_center.setZero();
+        Eigen::VectorXi local_bd;
+        igl::boundary_loop(local_F,local_bd);
+        for(int i=0;i<local_bd.rows();i++){
+          the_center += uv.row(local_bd(i));
         }
+        the_center /= local_bd.rows();
+        uv.row(interior_id) << the_center;
+        std::cout<<"move "<<interior_id<<std::endl;
+        std::cout<<"to "<<the_center<<std::endl;
+        collect_invalid_elements(V,F,uv,eps,avg,I);
+        break;
+      }
+    }
         invalid_size = I.sum();
         std::cout<<"invalid size "<<invalid_size<<std::endl;
-        //std::cout<<"valid face "<<valid_face<<std::endl;
-        std::cout<<"neighbor layer "<<neighbor<<std::endl;
         // also collapse its level-k neighbors
         std::set<int> S_aux;
-        // Eigen::MatrixXi FF,FFI; // adjacency map
-        // igl::triangle_triangle_adjacency(F,FF,FFI);
         Eigen::MatrixXi region;
-        for(int i=0;i<I.rows() && neighbor!=0;i++){
+        for(int i=0;layer!=0 && i<I.rows();i++){
             if(I(i)==0) continue;
             Eigen::VectorXi nbs;
-            get_neighbor_at_level(uv,F,dEF,i,neighbor,nbs,region);
+            get_neighbor_at_level(uv,F,dEF,i,layer,nbs,region);
             //S_aux.insert(S[i]);
             for(int j=0;j<nbs.rows();j++)
                 S_aux.insert(nbs(j));   
@@ -498,6 +482,15 @@ bool insert_vertex_back(
     int degree = 2;
     double total_time = 0.0;
     int ii = 0;
+    #define SHORTCUT
+    #ifdef SHORTCUT
+    // deserialize
+    std::string serial_name = "carter100";
+    igl::deserialize(ii,"ii",serial_name);
+    igl::deserialize(uv,"uv",serial_name);
+    igl::deserialize(F,"F",serial_name);
+    #endif
+    std::cout<<ii<<std::endl;
     for(;ii<L.size();ii++){
         double time1 = timer.getElapsedTime();
         std::cout<<"rollback "<<ii<<"/"<<L.size()<<std::endl;
@@ -548,6 +541,20 @@ bool insert_vertex_back(
                 maxenergy = std::get<1>(z);
             }
         }
+
+        if(ii%20 == 0){
+            // serialization
+            // - F
+            // - uv
+            // - ii
+            // model_name + eps + progressive_bin
+            std::string serial_name = "carter100";
+            igl::serialize(ii,"ii",serial_name,true);
+            igl::serialize(uv,"uv",serial_name);
+            igl::serialize(F,"F",serial_name);
+            std::cout<<"searialize "<<ii<<std::endl;
+        }
+
         if(found){
             auto F_t = F;
             int d = 0;

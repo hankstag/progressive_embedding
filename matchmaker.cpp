@@ -3,6 +3,7 @@
 #include "mst.h"
 #include "cut_mesh/HalfEdgeIterator.h"
 #include "edge_split.h"
+#include "plot.h"
 
 #include <igl/vertex_triangle_adjacency.h>
 #include <igl/opengl/glfw/Viewer.h>
@@ -19,6 +20,45 @@
 #include <algorithm> 
 #include <unordered_set>
 #include "progressive_embedding.h"
+
+void boundary_straightening(
+  Eigen::MatrixXd& P
+){
+  int n = P.rows();
+  // find first non-horizontal, non-vertical corner point
+  int i=0;
+  int offset=-1;
+  while(i<n){
+    int prev = (i+n-1)%n;
+    int curr = i;
+    int next = (i+1) % n;
+    bool vertical   = (std::abs(P(curr,0) - P(prev,0))<1e-15 && std::abs(P(curr,0) - P(next,0))<1e-15);
+    bool horizontal = (std::abs(P(curr,1) - P(prev,1))<1e-15 && std::abs(P(curr,1) - P(next,1))<1e-15);
+    if(!vertical && !horizontal)
+      offset=i;
+    i++;
+  }
+  bool colinear;
+  double x_mem = P(offset,0);
+  double y_mem = P(offset,1);
+  for(int d=0;d<n;d++){
+    int i = (d+offset) % n;
+    int prev = (i+n-1)%n;
+    int curr = i;
+    int next = (i+1) % n;
+    bool vertical   = (std::abs(P(curr,0) - P(prev,0))<1e-15 && std::abs(P(curr,0) - P(next,0))<1e-15);
+    bool horizontal = (std::abs(P(curr,1) - P(prev,1))<1e-15 && std::abs(P(curr,1) - P(next,1))<1e-15);
+    if(vertical)
+      P(curr,0) = x_mem;
+    if(horizontal)
+      P(curr,1) = y_mem;
+    if(!horizontal && !vertical){
+      x_mem = P(curr,0);
+      y_mem = P(curr,1);
+    }
+  }
+
+}
 
 // precondition of Tutte's embedding
 // make sure the mesh is 3-connected
@@ -372,9 +412,15 @@ void match_maker(
   const Eigen::VectorXi& ci,
   const Eigen::VectorXi& R,
   const Eigen::VectorXi& T_s,
-  const Eigen::MatrixXd& P
+  const Eigen::MatrixXd& P_s
 ){
   Eigen::VectorXi T = T_s;
+  Eigen::MatrixXd P = P_s;
+  boundary_straightening(P);
+  Eigen::VectorXi H(P.rows());
+  H.setZero();
+  igl::opengl::glfw::Viewer vr;
+  //plot_polygon(vr,H,P);
   remove_ears(V,F);
   // [ use Shor to get list of polygons ]
   Eigen::MatrixXd V2;
