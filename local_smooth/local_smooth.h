@@ -21,7 +21,6 @@ void local_smoothing(
     const Eigen::VectorXi& M, // constraints marked as 1
     Eigen::MatrixXd& uv,
     int loop,
-    double target_area,
     double eps
 );
 

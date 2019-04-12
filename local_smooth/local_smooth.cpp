@@ -84,13 +84,12 @@ void local_smoothing(
     const Eigen::VectorXi& M, // constraints marked as 1
     Eigen::MatrixXd& uv,
     int loop,
-    double target_area,
     double eps
 ){
     std::vector<std::vector<int>> VF,VFi;
     igl::vertex_triangle_adjacency(V,F,VF,VFi);
     // initialize smallest area
-    //double target_area = -1e5;
+    double target_area = -1e5;
     int itr_g = 0;
     Eigen::VectorXi C;
     coloring_mesh(F,C);
@@ -120,26 +119,26 @@ void local_smoothing(
         #endif
         // calc average area
         Eigen::VectorXd area;
-        // target_area = 0;
+        target_area = 0;
         igl::doublearea(uv,F,area);
-        // for(int k=0;k<area.rows();k++){
-        //     if(!std::isnan(area(k)) && !std::isinf(area(k))){
-        //         target_area += area(k);
-        //     }
-        // }
-        // //std::cout<<target_area<<" divide into "<<F.rows()<<std::endl;
-        // target_area /= F.rows();
-        // if(itr_g == 0){ // update min_area every 5 iterations
-        //     double da = target_area;
-        //     //std::cout<<"target area "<<da<<std::endl;
-        //     // use equilateral with area dlA as target
-        //     double h = std::sqrt( double(da)/sin(M_PI / 3.0));
-        //     Eigen::Matrix<double,3,3> Tx;
-        //     Tx<<0,0,0,h,0,0,h/2.,(std::sqrt(3)/2.)*h,0;
-        //     Eigen::Matrix<double,3,3> gx;
-        //     grad_operator(Tx,gx);
-        //     G_t = gx.topRows(2);
-        // }
+        for(int k=0;k<area.rows();k++){
+            if(!std::isnan(area(k)) && !std::isinf(area(k))){
+                target_area += area(k);
+            }
+        }
+        //std::cout<<target_area<<" divide into "<<F.rows()<<std::endl;
+        target_area /= F.rows();
+        if(itr_g == 0){ // update min_area every 5 iterations
+            double da = target_area;
+            //std::cout<<"target area "<<da<<std::endl;
+            // use equilateral with area dlA as target
+            double h = std::sqrt( double(da)/sin(M_PI / 3.0));
+            Eigen::Matrix<double,3,3> Tx;
+            Tx<<0,0,0,h,0,0,h/2.,(std::sqrt(3)/2.)*h,0;
+            Eigen::Matrix<double,3,3> gx;
+            grad_operator(Tx,gx);
+            G_t = gx.topRows(2);
+        }
         #ifdef DEBUG
         std::cout<<"current min area "<<area.minCoeff()<<std::endl;
         double my_min = 1e5;

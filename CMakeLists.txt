@@ -35,6 +35,7 @@ target_compile_definitions(tbb_static PUBLIC -DUSE_TBB)
 add_library(progressive_embedding 
 local_operation.cpp    
 progressive_embedding.cpp
+local_smooth/energy.cpp
 local_smooth/auto_grad.cpp    
 local_smooth/coloring_mesh.cpp 
 local_smooth/local_smooth.cpp)

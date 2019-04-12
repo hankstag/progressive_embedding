@@ -374,8 +374,8 @@ void collapse_invalid_elements(
         if(B(a) == 1 || B(b) == 1) continue;
         std::vector<int> N; // 1-ring neighbor
         if(edge_collapse_is_valid(e,uv.row(b),uv,F,dEF,dEI,EE,allE,N)){
-          std::sort(N.begin(),N.end());
-          N.erase( std::unique(N.begin(), N.end()), N.end() );
+          std::sort(N.begin(), N.end());
+          N.erase( std::unique( N.begin(), N.end() ), N.end() );
           Eigen::VectorXi nbi;
           igl::list_to_matrix(N,nbi);
           Eigen::MatrixXd nb(N.size()*3,2);
@@ -399,8 +399,7 @@ void collapse_invalid_elements(
       }
     }
 
-    // for updated elements
-    // update validity status
+    // remark invalid elements
     for(int i=0;i<I.rows();i++){
       if(updated(i)){
         if(F.row(i).sum() == 0)
@@ -473,7 +472,8 @@ bool insert_vertex_back(
   const Eigen::VectorXi& B,
   const Eigen::MatrixXd& V,
   Eigen::MatrixXi& F,
-  Eigen::MatrixXd& uv
+  Eigen::MatrixXd& uv,
+  double total_area
 ){
   // for every action in the list
     igl::Timer timer;
@@ -541,20 +541,6 @@ bool insert_vertex_back(
                 maxenergy = std::get<1>(z);
             }
         }
-
-        // if(ii%200 == 0){
-        //     // serialization
-        //     // - F
-        //     // - uv
-        //     // - ii
-        //     // model_name + eps + progressive_bin
-        //     std::string serial_name = "carter100";
-        //     igl::serialize(ii,"ii",serial_name,true);
-        //     igl::serialize(uv,"uv",serial_name);
-        //     igl::serialize(F,"F",serial_name);
-        //     std::cout<<"searialize "<<ii<<std::endl;
-        // }
-
         if(found){
             auto F_t = F;
             int d = 0;
@@ -565,7 +551,7 @@ bool insert_vertex_back(
             F_t.conservativeResize(d,3);
             std::cout<<"current face size "<<d<<"/"<<F.rows()<<std::endl;
             uv.row(v1) << pos;
-            local_smoothing(V,F_t,B,uv,10,avg,1e10);
+            local_smoothing(V,F_t,B,uv,20,1e10);
         }else{
             F = F_store;
             uv = uv_store;
@@ -623,7 +609,7 @@ bool insert_vertex_back(
             }
             F_t.conservativeResize(d,3);
             auto uv_o = uv;
-            local_smoothing(V,F_t,B,uv,100,avg,1e10);
+            local_smoothing(V,F_t,B,uv,100,1e10);
             ii--;
         }
         double time2 = timer.getElapsedTime();
@@ -667,9 +653,10 @@ bool progressive_embedding(
   
   std::vector<Action> L; // list of collapse operation stored
   collapse_invalid_elements(V,F,uv,I,B,eps,avg,L);
+
   // [ invert vertex in reverse order of L ]
   std::reverse(L.begin(),L.end());
-  insert_vertex_back(L,B,V,F,uv);
+  insert_vertex_back(L,B,V,F,uv,area_total);
   
   // [ check result ]
   Eigen::VectorXi T;

@@ -8,8 +8,6 @@ void plot_polygon(
   const Eigen::MatrixXd& poly
 ){
   viewer.data().clear();
-  igl::opengl::glfw::imgui::ImGuiMenu menu;
-  viewer.plugins.push_back(&menu);
   viewer.core().align_camera_center(poly);
   for(int i=0;i<poly.rows();i++){
     int i_1 = (i+1) % poly.rows();
@@ -20,7 +18,6 @@ void plot_polygon(
     if(H(i))
       viewer.data().add_points(poly.row(i),Eigen::RowVector3d(0,0,0));
   }
-  viewer.launch();
 }
 
 void plot_mesh(
@@ -32,6 +29,7 @@ void plot_mesh(
 ){
   viewer.data().clear();
   viewer.data().set_mesh(V,F);
+  viewer.core().align_camera_center(V,F);
   if(show_boundary){
     Eigen::VectorXi bd;
     igl::boundary_loop(F,bd);
@@ -43,5 +41,40 @@ void plot_mesh(
   for(int i: id){
     viewer.data().add_points(V.row(i),Eigen::RowVector3d(1,0,0));
   }
-  viewer.launch();
+}
+
+// For several mesh/polygon at the same time
+// using number key to switch between them
+// usage example:  
+// std::vector<Object> Os = {Object(V,F,OTYPE::MESH),
+//                           Object(polygon,F,OTYPE::POLYGON),
+//                           Object(uv,F,OTYPE::MESH)};
+// plots(Os);
+
+void plots(
+  std::vector<Object>& data 
+){
+  igl::opengl::glfw::Viewer vr;
+  int item_num = data.size();
+  auto key_down = [&](
+    igl::opengl::glfw::Viewer& viewer, unsigned char key, int modifier
+  ){
+    int id = (key - '0');
+    std::cout<<"choose "<<id<<std::endl;
+    if(id >= data.size() || id < 0) return false;
+    Object obj = data[id];
+    
+    Eigen::MatrixXd V=data[id].V;
+    Eigen::MatrixXi F=data[id].F;
+    Eigen::VectorXi H;
+    H.setZero(V.rows());
+    switch(obj.get_type()){
+      case OTYPE::POLYGON: plot_polygon(viewer,H,V);break;
+      case OTYPE::MESH: plot_mesh(viewer,V,F,{}); break;
+      default: std::cout<<"other case"<<std::endl;
+    }
+    return false;
+  };
+  vr.callback_key_down = key_down;
+  vr.launch();
 }
