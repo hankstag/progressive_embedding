@@ -21,4 +21,13 @@ bool progressive_fix(
     Eigen::MatrixXd& uv
 );
 
+int expand_to_boundary(
+  const Eigen::MatrixXd& V,
+  const Eigen::MatrixXi& F,
+  const Eigen::VectorXi& B,
+  const Eigen::MatrixXi& dEF_s,
+  const int fid,
+  Eigen::MatrixXi& local_F
+);
+
 #endif

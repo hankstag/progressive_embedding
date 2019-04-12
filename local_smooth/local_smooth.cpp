@@ -15,7 +15,7 @@
 #include <time.h>  
 #include "coloring_mesh.h"
 #include <tbb/parallel_for.h>
-//#define DEBUG
+#define DEBUG
 
 void compute_dirichlet_energy(
   const double target_area,
