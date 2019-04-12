@@ -53,7 +53,7 @@ set(MATCHMAKER_FILES
     matchmaker.cpp
     mst.cpp
     decompose_polygon.cpp
-    count_flipped_elements.cpp
+    flipped_elements.cpp
     embed_points.cpp
     plot.cpp
     loader.cpp
@@ -61,7 +61,7 @@ set(MATCHMAKER_FILES
 
 set(MAPTOCONVEX_FILES
   map_to_convex.cpp
-  count_flipped_elements.cpp
+  flipped_elements.cpp
   plot.cpp
   loader.cpp
 )

@@ -7,7 +7,7 @@
 //               than A
 
 #include <Eigen/Core>
-#include "../count_flipped_elements.h"
+#include "../flipped_elements.h"
 
 template <typename Scalar>
 void grad_operator(

@@ -1,7 +1,7 @@
 #include "progressive_embedding.h"
 #include <Eigen/Dense>
-
 #include "local_operation.h"
+#include "local_smooth/energy.h"
 #include <queue>
 #include <igl/triangle_triangle_adjacency.h>
 #include <igl/opengl/glfw/Viewer.h>
@@ -266,7 +266,7 @@ std::pair<bool,double> flip_avoid_line_search(
     }
     std::vector<double> one_ring_chosen;
     Eigen::Matrix<double,2,3> G_t;
-    compute_gradient(target_area,G_t);
+    grad_to_eqtri(target_area,G_t);
     
     for(int it = 0;it<MAX_IT;it++){
         Eigen::RowVector2d pt;
@@ -356,7 +356,7 @@ void collapse_invalid_elements(
   igl::edge_flaps(F,E,allE,EMAP,EF,EI,dEF,dEI,EE);
   
   Eigen::Matrix<double,2,3> G; // grad operator
-  compute_gradient(avg,G);
+  grad_to_eqtri(avg,G);
 
   int invalid_size = I.sum();
   const int MAX_LAYER = 5;
@@ -647,9 +647,21 @@ bool progressive_embedding(
   for(int i=0;i<bi.rows();i++)
     B(bi(i)) = 1;
 
-  // [ Pipeline starts]
+  // [ collect invalid elements ]
+  Eigen::VectorXd E(F.rows());
+  Eigen::Matrix<double,2,3> G;
+  grad_to_eqtri(avg,G);
+  for(int i=0;i<F.rows();i++){
+    Eigen::Matrix<double,3,2> T;
+    T<<uv.row(F(i,0)),uv.row(F(i,1)),uv.row(F(i,2));
+    E(i) = autogen::sd_energy(T,G);
+  }
   Eigen::VectorXi I;
-  collect_invalid_elements(V,F,uv,eps,avg,I);
+  flipped_elements(uv,F,I);
+  for(int i=0;i<F.rows();i++){
+    if(!std::isfinite(E(i))||E(i)>eps)
+      I(i)=1;
+  }
   
   std::vector<Action> L; // list of collapse operation stored
   collapse_invalid_elements(V,F,uv,I,B,eps,avg,L);

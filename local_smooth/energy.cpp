@@ -1,7 +1,7 @@
 #include "energy.h"
 #include <Eigen/Dense>
 
-void gradient_equilateral(
+void grad_to_eqtri(
   double target_area,
   Eigen::Matrix<double,2,3>& G_t
 ){

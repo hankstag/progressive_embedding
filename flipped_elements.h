@@ -1,5 +1,5 @@
-#ifndef COUNT_FLIPPED_ELEMENTS
-#define COUNT_FLIPPED_ELEMENTS
+#ifndef FLIPPED_ELEMENTS
+#define FLIPPED_ELEMENTS
 
 #include <Eigen/Core>
 #include <vector>
@@ -16,6 +16,12 @@ int test_flip(
 );
 
 void count_flipped_element(
+  const Eigen::MatrixXd& V,
+  const Eigen::MatrixXi& F,
+  Eigen::VectorXi& I
+);
+
+void flipped_elements(
   const Eigen::MatrixXd& V,
   const Eigen::MatrixXi& F,
   Eigen::VectorXi& I
