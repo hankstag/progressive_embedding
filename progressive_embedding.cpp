@@ -38,7 +38,21 @@ bool is_face_valid(
   return std::isfinite(e) && (e < threshold) && !flipped;
 }
 
-
+void move_to_center(
+  Eigen::MatrixXd& uv,
+  const Eigen::MatrixXi& F,
+  int i
+){
+  Eigen::VectorXi bd;
+  igl::boundary_loop(F,bd);
+  Eigen::RowVector2d center;
+  center.setZero();
+  for(int i=0;i<bd.rows();i++){
+    center += uv.row(bd(i));
+  }
+  center /= bd.rows();
+  uv.row(i) << center;
+}
 
 int expand_to_boundary(
   const Eigen::MatrixXd& V,
@@ -46,13 +60,11 @@ int expand_to_boundary(
   const Eigen::VectorXi& B,
   const Eigen::MatrixXi& dEF_s,
   const int fid,
-  Eigen::MatrixXi& local_F
+  Eigen::VectorXi& X
 ){
   Eigen::MatrixXi dEF = dEF_s;
   std::set<int> N;
   std::deque<int> Q;
-  N.clear();
-  int level = 0;
   for(int i=0;i<F.rows();i++){
     for(int k=0;k<3;k++){
       int e = F.rows()*((k+2)%3)+i;
@@ -76,72 +88,55 @@ int expand_to_boundary(
       }
     }
   }
-  Q.clear();
-  local_F.resize(N.size(),3);
+  X.resize(N.size());
   int i=0;
-  for(int x: N){    
-      local_F.row(i++)<<F.row(x);
-  }
+  for(int n: N)
+    X(i++) = n;
+  Eigen::MatrixXi local_F;
+  igl::slice(F,X,1,local_F);
   std::cout<<"count interior points for "<<std::endl;
-  int my_id = 0;
+  int in_id= 0;
   int count=0;
   std::set<int> interior;
   for(int i=0;i<local_F.rows();i++){
     for(int k=0;k<3;k++){
       int id = local_F(i,k);
       if(!B(id)){
-        my_id = id;
-        interior.insert(my_id);
-        //std::cout<<my_id<<std::endl;
+        in_id = id;
+        interior.insert(in_id);
       }
     }
   }
   std::cout<<"#interior point "<<interior.size()<<std::endl;
-  return interior.size()==1?my_id:-1;
+  return interior.size()==1?in_id:-1;
 }
 
-void get_neighbor_at_level(
+void neighbor_k_ring(
     const Eigen::MatrixXd& V,
     const Eigen::MatrixXi& F,
     const Eigen::MatrixXi& dEF,
     int fid,
-    int neighbor,
-    Eigen::VectorXi& nbs,
-    Eigen::MatrixXi& region
+    int layer,
+    std::set<int>& N // fid collection of neighbors
 ){
-    //std::cout << "Hello\n";
-    std::set<int> N;
     std::deque<std::pair<int,int>> Q;
-    N.clear();
-    int level = 0;
-    if(fid != -1){
-        std::pair<int,int> p(fid,0);
-        Q.push_back(p);
-        N.insert(fid);
-        int l = 0;
-        while(l<neighbor && !Q.empty()){
-            int f = Q.front().first;
-            l = Q.front().second;
-            if(l == neighbor) break;
-            Q.pop_front();
-            for(int i=0;i<3;i++){
-              int e = F.rows()*((i+2)%3)+f;
-              if(dEF(e,1)!=-1 && N.find(dEF(e,1))==N.end()){
-                    std::pair<int,int> p(dEF(e,1),l+1);
-                    Q.push_back(p);
-                    N.insert(dEF(e,1));
-              }
-            }
+    std::pair<int,int> p(fid,0);
+    Q.push_back(p);
+    N.insert(fid);
+    int l = 0;
+    while(l<layer && !Q.empty()){
+        int f = Q.front().first;
+        l = Q.front().second;
+        if(l == layer) break;
+        Q.pop_front();
+        for(int i=0;i<3;i++){
+          int e = F.rows()*((i+2)%3)+f;
+          if(dEF(e,1)!=-1 && N.find(dEF(e,1))==N.end()){
+                std::pair<int,int> p(dEF(e,1),l+1);
+                Q.push_back(p);
+                N.insert(dEF(e,1));
+          }
         }
-    }
-    Q.clear();
-    region.resize(N.size(),3);
-    int i=0;
-    nbs.resize(N.size());
-    //std::cout<<"neighbor num "<<region.rows()<<std::endl;
-    for(int x: N){
-        nbs.row(i)<<x; 
-        region.row(i++)<<F.row(x);
     }
 }
 
@@ -296,33 +291,6 @@ std::pair<bool,double> flip_avoid_line_search(
 
 using Action = std::tuple<int,int,Eigen::MatrixXi,std::vector<int>>;
 
-void collect_invalid_elements(
-  const Eigen::MatrixXd& V,
-  const Eigen::MatrixXi& F,
-  const Eigen::MatrixXd& uv,
-  const double eps,
-  const double avg,
-  Eigen::VectorXi& I
-){
-  // [init Dirichlet energy]
-  std::cout<<"init dirichlet energy ... "<<std::endl;
-  Eigen::VectorXd Energy;
-  std::vector<int> FL(F.rows());
-  std::iota(FL.begin(),FL.end(),0);
-  compute_dirichlet_energy(avg,uv,F,FL,0,Energy);
-  std::cout<<"done"<<std::endl;
-  
-  // [collect invalid elements]
-  std::cout<<"collect invalid elements ..."<<std::endl;
-  I.setZero(F.rows());
-  count_flipped_element(uv,F,I);
-  for(int i=0;i<F.rows();i++){
-    if(I(i) || F.row(i).sum()==0) continue;
-    if(!std::isfinite(Energy(i))||Energy(i)>eps)
-      I(i) = 1;
-  }
-}
-
 void collapse_invalid_elements(
   const Eigen::MatrixXd& V,
   Eigen::MatrixXi& F,
@@ -395,60 +363,40 @@ void collapse_invalid_elements(
     num_invalid = I.sum();
     std::cout<<"invalid size "<<num_invalid<<std::endl;
 
-    // expand to 1-ring neighbor if all collapse failed
     layer = do_collapse ? 0 : layer+1;
-    
     if(layer == MAX_LAYER){
       std::cout<<"move to barycenter"<<std::endl;
       int n = 0;
       for(int i=0;i<I.rows();i++){
         if(I(i) == 0) continue;
-        std::cout<<n++<<"/"<<I.sum()<<std::endl;
-        Eigen::MatrixXi local_F;
-        int interior_id=expand_to_boundary(V,F,B,dEF,i,local_F);
-        //exit(0);
-        if(interior_id==-1) continue;
-        //plot_mesh(vr,uv,local_F,{});
-        Eigen::RowVector2d the_center;
-        the_center.setZero();
-        Eigen::VectorXi local_bd;
-        igl::boundary_loop(local_F,local_bd);
-        for(int i=0;i<local_bd.rows();i++){
-          the_center += uv.row(local_bd(i));
-        }
-        the_center /= local_bd.rows();
-        uv.row(interior_id) << the_center;
-        std::cout<<"move "<<interior_id<<std::endl;
-        std::cout<<"to "<<the_center<<std::endl;
-        collect_invalid_elements(V,F,uv,eps,avg,I);
+        Eigen::VectorXi X;
+        Eigen::MatrixXi Fl;
+        int id = expand_to_boundary(V,F,B,dEF,i,X);
+        igl::slice(F,X,1,Fl);
+        if(id == -1) continue;
+        move_to_center(uv,Fl,id);
+        for(int j=0;j<X.rows();j++)
+          I(X(j))=0;
         break;
       }
     }
 
-        // also collapse its level-k neighbors
-        std::set<int> S_aux;
-        Eigen::MatrixXi region;
-        for(int i=0;layer!=0 && i<I.rows();i++){
-            if(I(i)==0) continue;
-            Eigen::VectorXi nbs;
-            get_neighbor_at_level(uv,F,dEF,i,layer,nbs,region);
-            //S_aux.insert(S[i]);
-            for(int j=0;j<nbs.rows();j++)
-                S_aux.insert(nbs(j));   
-        }
-        for(int s: S_aux){
-            int count = 0;
-            for(int k=0;k<3;k++){
-                if(B(F(s,k))==1)
-                //if(bdr_s.find(F(s,k)) != bdr_s.end()){
-                    count++;
-            }
-            if(count == 2)
-                continue;
-            I(s) = 1;
-        }
+    if(do_collapse) continue;
+    // if did not collapse anything
+    // also collapse its layer 1...k neighbors
+    std::set<int> W;
+    for(int i=0;i<I.rows();i++){
+        if(I(i)==0) continue;
+        std::set<int> N;
+        neighbor_k_ring(uv,F,dEF,i,layer,N);
+        for(int n: N)
+          W.insert(n);
     }
-    std::cout<<"L.size() is "<<L.size()<<std::endl;
+    for(int s: W){
+        if(B(F(s,0))+B(F(s,1))+B(F(s,2)) < 2)
+          I(s) = 1;
+    }
+  }
 }
 bool insert_vertex_back(
   const std::vector<Action>& L,
@@ -465,7 +413,7 @@ bool insert_vertex_back(
     int degree = 2;
     double total_time = 0.0;
     int ii = 0;
-    #define SHORTCUT
+    //#define SHORTCUT
     #ifdef SHORTCUT
     // deserialize
     std::string serial_name = "carter100";
@@ -648,15 +596,36 @@ bool progressive_embedding(
   
   std::vector<Action> L; // list of collapse operation stored
   collapse_invalid_elements(V,F,uv,I,B,eps,avg,L);
-
-  // [ invert vertex in reverse order of L ]
-  std::reverse(L.begin(),L.end());
-  insert_vertex_back(L,B,V,F,uv,area_total);
   
   // [ check result ]
   Eigen::VectorXi T;
   count_flipped_element(uv,F,T);
   std::cout<<"flipped: "<<T.sum()<<std::endl;
+  Eigen::VectorXd A;
+  Eigen::MatrixXi Fn=F;
+  int k=0;
+  for(int i=0;i<Fn.rows();i++){
+    if(F.row(i).sum()!=0)
+      Fn.row(k++) << F.row(i);
+  }
+  Fn.conservativeResize(k,3);
+  igl::doublearea(uv,Fn,A);
+  std::cout<<"max area: "<<A.maxCoeff()<<std::endl;
+  std::cout<<"min area: "<<A.minCoeff()<<std::endl;
+  E.setZero(Fn.rows());
+  for(int i=0;i<Fn.rows();i++){
+    Eigen::Matrix<double,3,2> T;
+    T<<uv.row(Fn(i,0)),uv.row(Fn(i,1)),uv.row(Fn(i,2));
+    E(i) = autogen::sd_energy(T,G);
+  }
+  std::cout<<"max energy "<<E.maxCoeff()<<std::endl;
+
+  // [ invert vertex in reverse order of L ]
+  std::reverse(L.begin(),L.end());
+  insert_vertex_back(L,B,V,F,uv,area_total);
+  
+
+
   igl::opengl::glfw::Viewer vr;
   vr.data().set_mesh(uv,F);
   vr.launch();

@@ -15,6 +15,7 @@ void plot_mesh(
   const Eigen::MatrixXd& V,
   const Eigen::MatrixXi& F,
   const std::vector<int>& id,
+  const Eigen::VectorXi& L, //hight faces
   bool show_boundary=false
 );
 

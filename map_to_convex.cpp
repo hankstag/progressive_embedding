@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
   igl::map_vertices_to_circle(V,bd,circle);
   Eigen::MatrixXd H;
   igl::harmonic(F,bd,circle,1,H);
-  progressive_embedding(V,F,H,bd,circle,1e20);
+  progressive_embedding(V,F,H,bd,circle,1e15);
   #else 
   Eigen::VectorXi b;
   Eigen::MatrixXd bc;
@@ -52,6 +52,6 @@ int main(int argc, char *argv[])
   #endif
 
   igl::opengl::glfw::Viewer vr;
-  plot_mesh(vr,uv,F,{});
+  plot_mesh(vr,uv,F,{},Eigen::VectorXi());
 
 }

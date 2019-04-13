@@ -227,7 +227,7 @@ int main(int argc, char *argv[])
   
   #define SHORTCUT
   #ifdef SHORTCUT
-  std::string serial_name = "carter_save_pb";
+  std::string serial_name = "local_save_pb";
   igl::deserialize(V,"V",serial_name);
   igl::deserialize(uv,"uv",serial_name);
   igl::deserialize(F,"F",serial_name);
@@ -284,12 +284,12 @@ int main(int argc, char *argv[])
   //       lengths.insert(NF.rows());
   //   }
   // }
-  progressive_embedding(V,F,uv,ci,c,1e100);
+  progressive_embedding(V,F,uv,ci,c,1e20);
   #endif
 
   match_maker(V,F,uv,c,ci,R,bd0,polygon);
   #endif
   igl::opengl::glfw::Viewer vr;
-  plot_mesh(vr,uv,F,{});
+  plot_mesh(vr,uv,F,{},Eigen::VectorXi());
 
 }

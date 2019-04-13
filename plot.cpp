@@ -25,11 +25,14 @@ void plot_mesh(
   const Eigen::MatrixXd& V,
   const Eigen::MatrixXi& F,
   const std::vector<int>& id,
+  const Eigen::VectorXi& L, //hight faces
   bool show_boundary
 ){
   viewer.data().clear();
   viewer.data().set_mesh(V,F);
   viewer.core().align_camera_center(V,F);
+  Eigen::MatrixXd C(F.rows(),3);
+  C.setConstant(1);
   if(show_boundary){
     Eigen::VectorXi bd;
     igl::boundary_loop(F,bd);
@@ -41,6 +44,12 @@ void plot_mesh(
   for(int i: id){
     viewer.data().add_points(V.row(i),Eigen::RowVector3d(1,0,0));
   }
+  for(int i=0;i<L.rows();i++){
+    if(L(i)!=0)
+      C.row(i) << 1,0,0;
+  }
+  if(L.sum()>0)
+    viewer.data().set_colors(C);
 }
 
 // For several mesh/polygon at the same time
@@ -70,7 +79,7 @@ void plots(
     H.setZero(V.rows());
     switch(obj.get_type()){
       case OTYPE::POLYGON: plot_polygon(viewer,H,V);break;
-      case OTYPE::MESH: plot_mesh(viewer,V,F,{}); break;
+      case OTYPE::MESH: plot_mesh(viewer,V,F,{},Eigen::VectorXi()); break;
       default: std::cout<<"other case"<<std::endl;
     }
     return false;
