@@ -21,21 +21,6 @@
 #include "local_smooth/auto_grad.hpp"
 #define LOG
 
-// given a target area for reference shape
-// compute the gradient operator
-void compute_gradient(
-  double target_area,
-  Eigen::Matrix<double,2,3>& G_t
-){
-  double h = std::sqrt( target_area/sin(M_PI / 3.0));
-  Eigen::Matrix<double,3,3> Tx;
-  Tx<<0,0,0,h,0,0,h/2.,(std::sqrt(3)/2.)*h,0;
-  Eigen::Matrix<double,3,3> gx;
-  grad_operator(Tx,gx);
-  G_t.resize(3,2);
-  G_t = gx.topRows(2);
-}
-
 bool is_face_flipped(const Eigen::Matrix<double,3,2>& T){
   double a[2] = {T(0,0),T(0,1)};
   double b[2] = {T(1,0),T(1,1)};
@@ -309,7 +294,7 @@ std::pair<bool,double> flip_avoid_line_search(
     return std::make_pair(valid,maxenergy);
 }
 
-using Action = std::tuple<int,int,Eigen::MatrixXi,Eigen::VectorXi,bool>;
+using Action = std::tuple<int,int,Eigen::MatrixXi,std::vector<int>>;
 
 void collect_invalid_elements(
   const Eigen::MatrixXd& V,
@@ -348,72 +333,71 @@ void collapse_invalid_elements(
   const double avg,
   std::vector<Action>& L
 ){
-  std::vector<int> FL(F.rows());
-  std::iota(FL.begin(),FL.end(),0);
+
+  // Build adjacency info
   Eigen::VectorXi EMAP,EE;
   Eigen::MatrixXi E,EF,EI;
   Eigen::MatrixXi dEF,dEI,allE;
   igl::edge_flaps(F,E,allE,EMAP,EF,EI,dEF,dEI,EE);
   
-  Eigen::Matrix<double,2,3> G; // grad operator
+  // Use the same size reference shape through out collapsing
+  Eigen::Matrix<double,2,3> G;
   grad_to_eqtri(avg,G);
 
-  int invalid_size = I.sum();
+  // Try collapsing an edge 
+  // mark the 1-ring faces as `updated` if succ
+  auto collapse_if_valid = [&](
+    int f, int k, Eigen::VectorXi& updated
+  ){
+    int e = F.rows()*((k+2)%3)+f;
+    int a = F(f,k), b = F(f,(k+1)%3);
+    if(B(a) == 1 || B(b) == 1) return false;
+    std::vector<int> N; // 1-ring neighbor exclude the collapsed
+    if(edge_collapse_is_valid(e,uv.row(b),uv,F,dEF,dEI,EE,allE,N)){
+      // unmark the collapsed faces
+      I(f)=0;
+      I(dEF(e,1))=0;
+      Eigen::MatrixXi ring(N.size(),3);
+      for(int i=0;i<N.size();i++){
+        ring.row(i) << F.row(N[i]);
+        updated(N[i]) = 1;
+      }
+      if(a > b) std::swap(a,b);
+      L.push_back(Action(b,a,ring,N));
+      collapse_edge(e,uv.row(a),uv,F,dEF,dEI,EE,allE);
+      return true;
+    }
+    return false;
+  };
+
+  int num_invalid = I.sum();
   const int MAX_LAYER = 5;
   int layer = 0;
-  int valid_faces = 0;
-  while(invalid_size!=0){
+  while(num_invalid!=0){
     bool do_collapse = false;
     Eigen::VectorXi updated(F.rows());
     updated.setZero();
     for(int f=0;f<I.rows();f++){
       if(I(f)==0) continue;
       for(int k=0;k<3;k++){
-        int e = F.rows()*((k+2)%3)+f;
-        int a = F(f,k), b = F(f,(k+1)%3);
-        if(B(a) == 1 || B(b) == 1) continue;
-        std::vector<int> N; // 1-ring neighbor
-        if(edge_collapse_is_valid(e,uv.row(b),uv,F,dEF,dEI,EE,allE,N)){
-          std::sort(N.begin(), N.end());
-          N.erase( std::unique( N.begin(), N.end() ), N.end() );
-          Eigen::VectorXi nbi;
-          igl::list_to_matrix(N,nbi);
-          Eigen::MatrixXd nb(N.size()*3,2);
-          Eigen::MatrixXi F_store(nbi.rows(),3);
-          // collect all the positions beside a and b
-          int fn = 0;
-          for(int fi: N){
-              if(F.row(fi).sum()==0) continue;
-              F_store.row(fn++)<<F.row(fi);
-          }
-          F_store.conservativeResize(fn,3);
-          Eigen::RowVector2d pt;
-          pt = uv.row(std::min(a,b));
-          L.push_back(Action(std::max(a,b),std::min(a,b),F_store,nbi,false));
-          collapse_edge(e,pt,uv,F,dEF,dEI,EE,allE,{});
-          do_collapse = true;
-          for(int n: N){
-            updated(n) = 1;
-          }
-        }
+        do_collapse = (do_collapse || collapse_if_valid(f,k,updated));
       }
     }
-
-    // remark invalid elements
+    // check and mark invalid elements
+    // for updated elements
     for(int i=0;i<I.rows();i++){
       if(updated(i)){
-        if(F.row(i).sum() == 0)
-          I(i) = 0;
-        else{
-          Eigen::Matrix<double,3,2> T;
-          T<<uv.row(F(i,0)),uv.row(F(i,1)),uv.row(F(i,2));
-          I(i) = !is_face_valid(G,T,eps);
-        }
+        Eigen::Matrix<double,3,2> T;
+        T<<uv.row(F(i,0)),uv.row(F(i,1)),uv.row(F(i,2));
+        I(i) = !is_face_valid(G,T,eps);
       }
     }
+    num_invalid = I.sum();
+    std::cout<<"invalid size "<<num_invalid<<std::endl;
 
     // expand to 1-ring neighbor if all collapse failed
     layer = do_collapse ? 0 : layer+1;
+    
     if(layer == MAX_LAYER){
       std::cout<<"move to barycenter"<<std::endl;
       int n = 0;
@@ -440,8 +424,7 @@ void collapse_invalid_elements(
         break;
       }
     }
-        invalid_size = I.sum();
-        std::cout<<"invalid size "<<invalid_size<<std::endl;
+
         // also collapse its level-k neighbors
         std::set<int> S_aux;
         Eigen::MatrixXi region;
@@ -497,7 +480,7 @@ bool insert_vertex_back(
         std::cout<<std::get<0>(L[ii])<<" <-> "<<std::get<1>(L[ii])<<std::endl;
         auto a = L[ii];
         Eigen::MatrixXi ring = std::get<2>(a);
-        Eigen::VectorXi nbs = std::get<3>(a);
+        std::vector<int> nbs = std::get<3>(a);
         // position candidates
         bool found = false;
         Eigen::RowVectorXd pos(2);
@@ -509,8 +492,8 @@ bool insert_vertex_back(
         auto uv_store = uv;
         uv.row(v1) = uv.row(v0);
         auto F_store = F;
-        for(int j=0;j<nbs.rows();j++)
-            F.row(nbs(j))<<ring.row(j);
+        for(int j=0;j<nbs.size();j++)
+            F.row(nbs[j])<<ring.row(j);
         double angle_sum_of_v0 = calculate_angle_sum(ring,uv,v0,v1);
         if(angle_sum_of_v0 < igl::PI)
             std::swap(v0,v1);
@@ -635,9 +618,9 @@ bool progressive_embedding(
   igl::doublearea(uv,F,area);
   double avg = 0;
   for(int k=0;k<area.rows();k++){
-      if(std::isfinite(area(k))){
-          area_total += area(k);
-      }
+    if(std::isfinite(area(k))){
+      area_total += area(k);
+    }
   }
   avg = area_total / F.rows();
 

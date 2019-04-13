@@ -160,6 +160,14 @@ bool edge_collapse_is_valid(
         valid = true;
     Ns.insert(Ns.begin(),Nd.begin(),Nd.end());
     NF = Ns;
+    std::sort(NF.begin(),NF.end());
+    NF.erase( std::unique(NF.begin(),NF.end()),NF.end());
+    int f0 = dEF(ae,0);
+    int f1 = dEF(ae,1);
+    auto loc = std::find(NF.begin(),NF.end(),f0);
+    NF.erase(loc);
+    loc = std::find(NF.begin(),NF.end(),f1);
+    NF.erase(loc);
     // Eigen::VectorXi nf,nc(2),lf,IA_;
     // nc<<dEF(ae,0),dEF(ae,1);
     // igl::list_to_matrix(NF,nf);
@@ -185,7 +193,7 @@ bool edge_collapse_is_valid(
     //     return flipped;
     // };
     //flipped = test_flip(LV,LF);
-    flipped = false;
+    //flipped = false;
     if(!valid) {
         return false;
     }
@@ -200,8 +208,7 @@ bool collapse_edge(
     Eigen::MatrixXi& dEF,
     Eigen::MatrixXi& dEI,
     Eigen::VectorXi& EE,
-    Eigen::MatrixXi& allE,
-    const std::set<int>& prior
+    Eigen::MatrixXi& allE
 ){
     // Assign this to 0 rather than, say, -1 so that deleted elements will get
     // draw as degenerate elements at vertex 0 (which should always exist and
@@ -214,10 +221,6 @@ bool collapse_edge(
 
     // if non is control points, then pick the smaller
     bool choose_d = d < s ? true : false;
-    if(prior.find(d) != prior.end())
-        choose_d = true;
-    else if(prior.find(s) != prior.end())
-        choose_d = false;
     int to_drop = choose_d ? s : d;
     int to_keep = choose_d ? d : s;
     // std::cout<<to_drop<<" is dropped "<<std::endl;

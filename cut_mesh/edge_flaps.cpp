@@ -139,10 +139,5 @@ IGL_INLINE void igl::edge_flaps(
             EE(uE2E[i][j]) = uE2E[i][(j+1)%uE2E[i].size()];
         }
     }
-    // check EE
-    for(int i=0;i<EE.rows();i++){
-        int a = EE[i];
-        int b = EE[a];
-    }
     return edge_flaps(F,cE, allE, cEMAP,EF,EI, dEF, dEI);
 }

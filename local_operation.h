@@ -83,8 +83,7 @@ bool collapse_edge(
     Eigen::MatrixXi& dEF,
     Eigen::MatrixXi& dEI,
     Eigen::VectorXi& EE,
-    Eigen::MatrixXi& allE,
-    const std::set<int>& prior={}
+    Eigen::MatrixXi& allE
 );
 
 #endif
