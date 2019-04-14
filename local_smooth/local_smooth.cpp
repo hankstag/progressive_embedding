@@ -102,6 +102,7 @@ void local_smoothing(
     grad_to_eqtri(target_area,G_t);
     std::ofstream mf;
     Eigen::VectorXd Energy(F.rows());
+    Eigen::VectorXd VE(V.rows());
     auto step = [&]()->int{
       
       std::cout<<"itr_g "<<itr_g<<std::endl;
@@ -119,6 +120,7 @@ void local_smoothing(
         double max_energy = std::numeric_limits<double>::min();
         for(int f: nb){
           max_energy = std::max(max_energy,Energy(f));
+          VE(i) = max_energy;
         }
         if(max_energy > eps && M(i) != 1)
           lt.push_back(i);
@@ -151,43 +153,31 @@ void local_smoothing(
             H.setZero();
             double old_energy = 0.0;
             
+            // compute J and H for vertex i
             for(int k=0;k<VF[i].size();k++){
-                int f = VF[i][k];
-                Eigen::Matrix<double,3,2> Tuv;
-                Eigen::Matrix<double,3,3> T;
-                Eigen::Matrix<double,2,3> G;
-                if(Energy(f) < eps){
-                  Eigen::Matrix<double,3,3> T0;
-                  T0 << Tuv, Eigen::Vector3d::Zero();
-                  std::cout<<T0<<std::endl;
-                  std::cout<<"==="<<std::endl;
-                  std::cout<<Tuv<<std::endl;
-                }
-                for(int t=0;t<3;t++){
-                            int s = (t+VFi[i][k])%3;
-                            Tuv.row(t) << uv.row(F(f,s));
-                        }
-                        Eigen::Matrix<double,2,3> G_e;
-                        if(Energy(f) > eps){
-                            G_e = G_t;
-                        }else{
-                            // use uv itself as target -> meaning try to keep the same
-                            T.block(0,0,3,2) = Tuv;
-                            T.col(2).setZero();
-                            Eigen::Matrix<double,3,3> g;
-                            grad_operator(T,g);
-                            G_e = g.topRows(2);
-                        }
-                        
-                        Eigen::Matrix<double,1,2> Jl;
-                        Eigen::Matrix<double,2,2> Hl;
-                        autogen::sd_grad(Tuv,G_e,Jl);
-                        autogen::sd_hess(Tuv,G_e,Hl);
-                        Energy(f) = autogen::sd_energy(Tuv,G_e);
-                        old_energy = std::max(Energy(f),old_energy);
-                        J += Jl;
-                        H += Hl;
-                    }
+              int f = VF[i][k];
+              Eigen::Matrix<double,3,2> Tuv;
+              for(int t=0;t<3;t++){
+                int s = (t+VFi[i][k])%3;
+                Tuv.row(t) << uv.row(F(f,s));
+              }
+              Eigen::Matrix<double,3,3> T;
+              Eigen::Matrix<double,2,3> G_e;
+              Eigen::Matrix<double,3,3> g;
+              if(Energy(f) < eps){
+                Eigen::Matrix<double,3,3> T0;
+                T0 << Tuv, Eigen::Vector3d::Zero();
+                grad_operator(T0,g);
+                G_e = g.topRows(2);
+              }else
+                grad_to_eqtri(target_area, G_e);
+              Eigen::Matrix<double,1,2> Jl;
+              Eigen::Matrix<double,2,2> Hl;
+              autogen::sd_grad(Tuv,G_e,Jl);
+              autogen::sd_hess(Tuv,G_e,Hl);
+              J += Jl;
+              H += Hl;
+            }
                     // gradient descent/Newton's method on vertex i
                     double alpha = 1.0;
                     Eigen::Matrix<double,1,2> uv_n;
@@ -231,7 +221,7 @@ void local_smoothing(
                             //std::cout<<new_energy<<std::endl;
                             //new_energy = std::max(energy_trial,new_energy);
                         }
-                        if(std::isinf(max_ring_energy) || std::isnan(max_ring_energy) || max_ring_energy > old_energy || flipped == true){
+                        if(std::isinf(max_ring_energy) || std::isnan(max_ring_energy) || max_ring_energy > VE(i) || flipped == true){
                             alpha /= 2;
                             uv.row(i) << posx,posy;
                             continue;

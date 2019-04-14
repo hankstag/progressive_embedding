@@ -143,27 +143,6 @@ void neighbor_k_ring(
     }
 }
 
-bool is_flipped(const Eigen::MatrixXd& V3d, const Eigen::MatrixXd& V, const Eigen::MatrixXi& F, const std::vector<int>& I){
-    // check flip
-    int flipped = 0;
-    for(int i: I){
-        int x = F(i,0);
-        int y = F(i,1);
-        int z = F(i,2);
-        double a[2] = {double(V(x, 0)), double(V(x, 1))};
-        double b[2] = {double(V(y, 0)), double(V(y, 1))};
-        double c[2] = {double(V(z, 0)), double(V(z, 1))};
-        short k = igl::copyleft::cgal::orient2D(a, b, c);
-        if(k <= 0) {
-            flipped++;
-        }
-    }
-    if(flipped>0)
-        return true;
-    else
-        return false;
-}
-
 void find_candidate_positions(
   const Eigen::MatrixXd& uv,
   const Eigen::MatrixXi& ring,
