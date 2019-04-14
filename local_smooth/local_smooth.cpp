@@ -1,4 +1,5 @@
 #include "local_smooth.h"
+#include "energy.h"
 #include "auto_grad.hpp"
 #include <igl/grad.h>
 #include <igl/adjacency_list.h>
@@ -84,126 +85,53 @@ void local_smoothing(
     const Eigen::VectorXi& M, // constraints marked as 1
     Eigen::MatrixXd& uv,
     int loop,
-    double eps
+    double eps,
+    double target_area
 ){
+  std::cout<<"current target area "<<target_area<<std::endl;
+  
     std::vector<std::vector<int>> VF,VFi;
     igl::vertex_triangle_adjacency(V,F,VF,VFi);
     // initialize smallest area
-    double target_area = -1e5;
+    //double target_area = -1e5;
     int itr_g = 0;
     Eigen::VectorXi C;
     coloring_mesh(F,C);
     std::cout<<"# color "<<C.maxCoeff()<<std::endl;
-    Eigen::Matrix<double,Eigen::Dynamic,1> Energy;
-    //auto cmp = [](std::pair<double,int> a, std::pair<double,int> b) { return a.first > b.first || (a.first == b.first && a.second > b.second);};
-    //std::set<std::pair<double,int>,decltype(cmp)> L(cmp);
-    int multiplier = 1;
     Eigen::Matrix<double,Eigen::Dynamic,1> A;
     A.setZero(F.rows());
     Eigen::Matrix<double,2,3> G_t;
+    grad_to_eqtri(target_area,G_t);
     std::ofstream mf;
-    #ifdef DEBUG
-    std::cout<<"export..."<<std::endl;
-    //mf.open("stat_"+model_name+".csv");
-    //mf<<"itr,min_area,target_area,Energy,flips\n";
-    #endif
-    // std::cout<<"# v:"<<V.rows()<<std::endl;
-    // std::cout<<"# f:"<<F.rows()<<std::endl;
-    // extern igl::Timer tom;
-    // extern std::ofstream timelog;
+    Eigen::VectorXd Energy(F.rows());
     auto step = [&]()->int{
-        Energy.setZero(F.rows());
-        int c = 0;
-        #ifdef DEBUG
-        std::cout<<"itr_g "<<itr_g<<std::endl;
-        #endif
-        // calc average area
-        Eigen::VectorXd area;
-        target_area = 0;
-        igl::doublearea(uv,F,area);
-        for(int k=0;k<area.rows();k++){
-            if(!std::isnan(area(k)) && !std::isinf(area(k))){
-                target_area += area(k);
-            }
+      std::cout<<"itr_g "<<itr_g<<std::endl;
+      
+      // collect list of vertices to be updated
+      // e.g. have max 1-ring energy > eps
+      std::vector<int> lt;
+      for(int f=0;f<F.rows();f++){
+        Eigen::Matrix<double,3,2> Tuv;
+        Tuv<<uv.row(F(f,0)),uv.row(F(f,1)),uv.row(F(f,2));
+        Energy(f) = autogen::sd_energy(Tuv,G_t);
+      }
+      for(int i=0;i<uv.rows();i++){
+        auto nb = VF[i];
+        double max_energy = std::numeric_limits<double>::min();
+        for(int f: nb){
+          max_energy = std::max(max_energy,E2(f));
         }
-        //std::cout<<target_area<<" divide into "<<F.rows()<<std::endl;
-        target_area /= F.rows();
-        if(itr_g == 0){ // update min_area every 5 iterations
-            double da = target_area;
-            //std::cout<<"target area "<<da<<std::endl;
-            // use equilateral with area dlA as target
-            double h = std::sqrt( double(da)/sin(M_PI / 3.0));
-            Eigen::Matrix<double,3,3> Tx;
-            Tx<<0,0,0,h,0,0,h/2.,(std::sqrt(3)/2.)*h,0;
-            Eigen::Matrix<double,3,3> gx;
-            grad_operator(Tx,gx);
-            G_t = gx.topRows(2);
-        }
-        #ifdef DEBUG
-        std::cout<<"current min area "<<area.minCoeff()<<std::endl;
-        double my_min = 1e5;
-        int min_i = 0;
-        for(int i=0;i<area.rows();i++){
-            if(my_min > area(i)){
-                my_min = area(i);
-                min_i = i;
-            }
-        }
-        std::cout<<"confirm min area "<<my_min<<" at "<<min_i<<" ("<<F(min_i,0)<<","<<F(min_i,1)<<","<<F(min_i,2)<<")"<<std::endl;
-        std::cout<<"current target area "<<target_area<<std::endl;
-        #endif
-        std::vector<int> lt;
-        //double t2 = timer.getElapsedTime();
-        #ifdef DEBUG
-        //std::cout<<"laps1 "<<t2-t1<<std::endl;
-        #endif
-        // mark the 2% of faces that has worst energy
-        // sort vertices according to the energy of neighbor
-        double max_init_energy;
-        Eigen::VectorXi updated_indices;
-        updated_indices.setZero(V.rows());
-        for(int i=0;i<V.rows();i++){
-            //double e = 0;
-            double max_ring_energy = 0;
-            for(int k=0;k<VF[i].size();k++){
-                int f = VF[i][k];
-                // Eigen::Matrix<double,3,2> Tuv;
-                // for(int t=0;t<3;t++){
-                //     // make sure vertex v is always the first in T
-                //     Tuv.row(t) << uv.row(F(f,t));
-                // }
-                // double energy = autogen::sd_energy(Tuv,G_t); 
-                Eigen::VectorXd SE;
-                compute_dirichlet_energy(target_area,uv,F,{f},eps,SE);
-                Energy(f) = SE(0);
-
-                max_ring_energy = std::max(Energy(f),max_ring_energy);
-                // if(energy < eps){
-                //     Energy(f) = 4;
-                //     e = 4;
-                // }else{
-                //     Energy(f) = energy;
-                //     if(std::isinf(energy)){
-                //         std::cout<<f<<std::endl;
-                //         std::cout<<std::setprecision(17)<<Tuv<<std::endl;
-                //         std::cout<<"inf\n";
-                //         exit(0);
-                //     }
-                //     e = std::max(energy,e);
-                // } 
-            }
-            if(max_ring_energy>4.0){
-                //L.insert(std::make_pair(max_ring_energy,i));
-                lt.push_back(i);
-            }
-            if(max_init_energy < max_ring_energy)
-                max_init_energy = max_ring_energy;
-        }
+        if(max_energy > eps)
+          lt.push_back(i);
+      }
         
+      Eigen::VectorXi updated_indices;
+      updated_indices.setZero(V.rows());
+
         int dt = 0;
         #ifdef DEBUG
         std::cout<<"size of L "<<lt.size()<<std::endl;
-        std::cout<<"max init energy "<<max_init_energy<<std::endl;
+        //std::cout<<"max init energy "<<max_init_energy<<std::endl;
         #endif
         // genearte a random sequence [0:L.size()]
         // srand (0);
@@ -236,7 +164,6 @@ void local_smoothing(
                     J.setZero();
                     H.setZero();
                     double old_energy = 0.0;
-                    c++;
                     double e_tt = 0.0;
                     for(int k=0;k<VF[i].size();k++){
                         int f = VF[i][k];

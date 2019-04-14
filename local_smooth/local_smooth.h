@@ -21,7 +21,8 @@ void local_smoothing(
     const Eigen::VectorXi& M, // constraints marked as 1
     Eigen::MatrixXd& uv,
     int loop,
-    double eps
+    double eps,
+    double target_area0
 );
 
 void compute_dirichlet_energy(

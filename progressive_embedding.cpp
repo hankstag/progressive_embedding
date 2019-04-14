@@ -477,13 +477,13 @@ bool insert_vertex_back(
       uv.row(v1) << pos;
       Eigen::MatrixXi Ft;
       drop_empty_faces(F,Ft);
-      local_smoothing(V,Ft,B,uv,20,1e10);
+      local_smoothing(V,Ft,B,uv,20,1e10,avg);
     }else{
       F = F_store;
       uv = uv_store;
       Eigen::MatrixXi Ft;
       drop_empty_faces(F,Ft);
-      local_smoothing(V,Ft,B,uv,100,1e10);
+      local_smoothing(V,Ft,B,uv,100,1e10,avg);
       ii--;
     }
 
