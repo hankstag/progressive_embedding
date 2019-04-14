@@ -95,9 +95,7 @@ void local_smoothing(
     // initialize smallest area
     //double target_area = -1e5;
     int itr_g = 0;
-    Eigen::VectorXi C;
-    coloring_mesh(F,C);
-    std::cout<<"# color "<<C.maxCoeff()<<std::endl;
+
     Eigen::Matrix<double,Eigen::Dynamic,1> A;
     A.setZero(F.rows());
     Eigen::Matrix<double,2,3> G_t;
@@ -105,6 +103,7 @@ void local_smoothing(
     std::ofstream mf;
     Eigen::VectorXd Energy(F.rows());
     auto step = [&]()->int{
+      
       std::cout<<"itr_g "<<itr_g<<std::endl;
       
       // collect list of vertices to be updated
@@ -119,57 +118,52 @@ void local_smoothing(
         auto nb = VF[i];
         double max_energy = std::numeric_limits<double>::min();
         for(int f: nb){
-          max_energy = std::max(max_energy,E2(f));
+          max_energy = std::max(max_energy,Energy(f));
         }
-        if(max_energy > eps)
+        if(max_energy > eps && M(i) != 1)
           lt.push_back(i);
       }
-        
-      Eigen::VectorXi updated_indices;
-      updated_indices.setZero(V.rows());
-
-        int dt = 0;
-        #ifdef DEBUG
-        std::cout<<"size of L "<<lt.size()<<std::endl;
-        //std::cout<<"max init energy "<<max_init_energy<<std::endl;
-        #endif
-        // genearte a random sequence [0:L.size()]
-        // srand (0);
-        // std::vector<int> RD;
-        // for(int r=0;r<L.size();r++){
-        //     RD.push_back(rand() % L.size());
-        // }
-        // std::set<std::pair<int,std::pair<double,int>>> rand_L;
-        // int r = 0;
-        // for(auto q: L){
-        //     rand_L.insert(std::make_pair(RD[r++],q));
-        // }
-        std::vector<std::vector<int>> groups;
-        groups.resize(C.maxCoeff()+1);
-        for(auto id: lt){
-            groups[C[id]].push_back(id);
-        } 
-        for(auto group : groups){
-            //int num = 0;
-//        for(auto x: lt){
-            //if(num++ > V.rows()/4) break;
-            tbb::parallel_for(tbb::blocked_range<size_t>( 0, group.size()), 
-            [&](const tbb::blocked_range<size_t>& r){
-                for(size_t id=r.begin();id!=r.end();id++){
-                    int i = group[id];
-                    //int i = x;
-                    if(M(i) == 1) continue;
-                    Eigen::Matrix<double,1,2> J;
-                    Eigen::Matrix<double,2,2> H;
-                    J.setZero();
-                    H.setZero();
-                    double old_energy = 0.0;
-                    double e_tt = 0.0;
-                    for(int k=0;k<VF[i].size();k++){
-                        int f = VF[i][k];
-                        Eigen::Matrix<double,3,2> Tuv;
-                        Eigen::Matrix<double,3,3> T;
-                        for(int t=0;t<3;t++){
+      std::cout<<"size of L "<<lt.size()<<std::endl;
+      
+      // put vertices of the same color into same group
+      Eigen::VectorXi C;
+      coloring_mesh(F,C);
+      std::vector<std::vector<int>> groups;
+      groups.resize(C.maxCoeff()+1);
+      for(auto id: lt){
+        groups[C[id]].push_back(id);
+      } 
+      
+      // optmization begins
+      Eigen::VectorXi updated;
+      updated.setZero(V.rows());
+      for(auto group : groups){
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, group.size()), 
+        [&](const tbb::blocked_range<size_t>& r){
+          for(size_t id=r.begin();id!=r.end();id++){
+            int i = group[id];
+            
+            // compute Jacobian and Hessian for every vertex i
+            // which is the sum of the J and H of adjacent faces
+            Eigen::Matrix<double,1,2> J;
+            Eigen::Matrix<double,2,2> H;
+            J.setZero();
+            H.setZero();
+            double old_energy = 0.0;
+            
+            for(int k=0;k<VF[i].size();k++){
+                int f = VF[i][k];
+                Eigen::Matrix<double,3,2> Tuv;
+                Eigen::Matrix<double,3,3> T;
+                Eigen::Matrix<double,2,3> G;
+                if(Energy(f) < eps){
+                  Eigen::Matrix<double,3,3> T0;
+                  T0 << Tuv, Eigen::Vector3d::Zero();
+                  std::cout<<T0<<std::endl;
+                  std::cout<<"==="<<std::endl;
+                  std::cout<<Tuv<<std::endl;
+                }
+                for(int t=0;t<3;t++){
                             int s = (t+VFi[i][k])%3;
                             Tuv.row(t) << uv.row(F(f,s));
                         }
@@ -242,13 +236,13 @@ void local_smoothing(
                             uv.row(i) << posx,posy;
                             continue;
                         }
-                        updated_indices(i) = 1;
+                        updated(i) = 1;
                         break;
                     }
                 }
             });
             #ifdef DEBUG
-            std::cout<<"sum of updated indices: "<<updated_indices.sum()<<std::endl;
+            std::cout<<"sum of updated indices: "<<updated.sum()<<std::endl;
             #endif
         }
         return 0; // test_flip(uv,F);
