@@ -165,131 +165,114 @@ bool is_flipped(const Eigen::MatrixXd& V3d, const Eigen::MatrixXd& V, const Eige
 }
 
 void find_candidate_positions(
-    const Eigen::MatrixXd& uv,
-    const Eigen::MatrixXi& ring,
-    int v,
-    int avoid,
-    Eigen::MatrixXd& pos
+  const Eigen::MatrixXd& uv,
+  const Eigen::MatrixXi& ring,
+  int v,
+  int avoid,
+  Eigen::MatrixXd& pos
 ){
-    int pi = 0;
-    pos.resize(ring.rows()*10,2);
-    for(int i=0;i<ring.rows();i++){
-        bool common = false;
-        for(int j=0;j<3;j++)
-            if(ring(i,j) == avoid){
-                common = true;
-            }
-        if(common) continue;
-        for(int k=0;k<3;k++){
-            if(ring(i,k) == v){
-                int x = ring(i,(k+1)%3);
-                int y = ring(i,(k+2)%3);
-                pos.row(pi++) << uv.row(x);
-                pos.row(pi++) << uv.row(y);
-                pos.row(pi++) << (uv.row(x) + uv.row(y))/2;
-            }
-        }
+  int pi = 0;
+  pos.resize(ring.rows()*10,2);
+  for(int i=0;i<ring.rows();i++){
+    bool common = false;
+    for(int j=0;j<3;j++)
+      if(ring(i,j) == avoid){
+        common = true;
+      }
+    if(common) continue;
+    for(int k=0;k<3;k++){
+      if(ring(i,k) == v){
+        int x = ring(i,(k+1)%3);
+        int y = ring(i,(k+2)%3);
+        pos.row(pi++) << uv.row(x);
+        pos.row(pi++) << uv.row(y);
+        pos.row(pi++) << (uv.row(x) + uv.row(y))/2;
+      }
     }
-    pos.conservativeResize(pi,2);
+  }
+  pos.conservativeResize(pi,2);
 
 }
 
 double calculate_angle_sum(
-    Eigen::MatrixXi& F,
-    Eigen::MatrixXd& V,
-    int v1,
-    int avoid
+  Eigen::MatrixXi& F,
+  Eigen::MatrixXd& V,
+  int v1,
+  int avoid
 ){
-    double angle_sum = 0;
-    for(int i=0;i<F.rows();i++){
-        bool common = false;
-        for(int j=0;j<3;j++)
-            if(F(i,j) == avoid){
-                common = true;
-            }
-        if(common) continue;
-        for(int k=0;k<3;k++){
-            if(F(i,k) == v1){
-                Eigen::Vector2d a = V.row(F(i,(k+2)%3));
-                Eigen::Vector2d b = V.row(v1);
-                Eigen::Vector2d c = V.row(F(i,(k+1)%3));
-                auto bc = c - b;
-                auto ba = a - b;
-                angle_sum += std::acos(bc.dot(ba)/(bc.norm()*ba.norm()));
-                break;
-            }
-        }
+  double angle_sum = 0;
+  for(int i=0;i<F.rows();i++){
+    bool common = false;
+    for(int j=0;j<3;j++)
+      if(F(i,j) == avoid)
+          common = true;
+    if(common) continue;
+    for(int k=0;k<3;k++){
+      if(F(i,k) == v1){
+        Eigen::Vector2d a = V.row(F(i,(k+2)%3));
+        Eigen::Vector2d b = V.row(v1);
+        Eigen::Vector2d c = V.row(F(i,(k+1)%3));
+        auto bc = c - b;
+        auto ba = a - b;
+        angle_sum += std::acos(bc.dot(ba)/(bc.norm()*ba.norm()));
+        break;
+      }
     }
-    return angle_sum;
+  }
+  return angle_sum;
 }
 
-// find a position for b that maximize the minarea in F
+// find a position for vertex v1 along the line (v0 --- t) s.t. the 
+// maximum energy of 1-ring neighbor of v1 is minimized and no flips
 std::pair<bool,double> flip_avoid_line_search(
-    const Eigen::MatrixXd& V,
-    Eigen::MatrixXd& uv,
-    const Eigen::MatrixXi& F,
-    int a0,
-    int b,
-    const Eigen::RowVectorXd& x, // initial guess for b is (x+a)/2
-    Eigen::RowVector2d& y,       // output position
-    double target_area
+  Eigen::MatrixXd& uv,
+  const Eigen::MatrixXi& F, // the ring
+  int a0,
+  int b,
+  const Eigen::RowVector2d& x, // initial guess for b is (x+a)/2
+  Eigen::RowVector2d& y,       // output position
+  double target_area
 ){
-    double t = 1.0;
-    int MAX_IT = 75;
-    bool valid = false;
-    double maxenergy = std::numeric_limits<double>::max();
-    //Eigen::VectorXi dirty;
-    std::vector<int> dirty;
-    for(int i=0;i<F.rows();i++){
-        for(int k=0;k<3;k++){
-            if(F(i,k) == b){
-                dirty.push_back(i);
-            }
-        }
+  double t = 1.0;
+  int MAX_IT = 75;
+  bool valid = true;
+  double max_energy = std::numeric_limits<double>::max();
+  std::vector<int> neighbor_b;
+  for(int i=0;i<F.rows();i++){
+    for(int k=0;k<3;k++){
+      if(F(i,k) == b){
+        neighbor_b.push_back(i);
+      }
     }
-    std::vector<double> one_ring_chosen;
-    Eigen::Matrix<double,2,3> G_t;
-    grad_to_eqtri(target_area,G_t);
-    
-    for(int it = 0;it<MAX_IT;it++){
-        Eigen::RowVector2d pt;
-        pt(0) = (1-t)*uv(a0,0)+t*x(0);
-        pt(1) = (1-t)*uv(a0,1)+t*x(1);
-        t *= 0.8;
-        uv.row(b) << pt;
-        // calculate the energy of dirty faces
-        std::vector<double> one_ring_energy;
-        for(int f: dirty){
-            Eigen::Matrix<double,3,3> T;
-            Eigen::Matrix<double,3,2> Tuv;
-            for(int t=0;t<3;t++){
-                // make sure vertex v is always the first in T
-                Tuv.row(t) << uv.row(F(f,t));
-                T.row(t) << V.row(F(f,t));
-            }
-            one_ring_energy.push_back(autogen::sd_energy(Tuv,G_t));
-        }
-        
-        double max_one_ring_energy = 0.0;
-        bool bad_element = false;
-        for(double z: one_ring_energy){
-            if(!std::isfinite(z))
-                bad_element = true;
-            if(z > max_one_ring_energy)
-                max_one_ring_energy = z;
-        }
-        if(is_flipped(V,uv,F,dirty) || bad_element) continue;
-        if(!std::isfinite(max_one_ring_energy))
-            valid = false;
-        else 
-            valid = true;
-        if(max_one_ring_energy < maxenergy){
-            maxenergy = max_one_ring_energy;
-            one_ring_chosen = one_ring_energy;
-            y = pt;
-        }
+  }
+  Eigen::Matrix<double,2,3> G_t;
+  grad_to_eqtri(target_area,G_t);
+  
+  for(int it = 0;it<MAX_IT;it++){
+    Eigen::RowVector2d pt;
+    pt(0) = (1-t)*uv(a0,0)+t*x(0);
+    pt(1) = (1-t)*uv(a0,1)+t*x(1);
+    t *= 0.8;
+    uv.row(b) << pt;
+    // calculate the energy of neighbors faces of b
+    std::vector<double> E; // one ring energy
+    valid = true;
+    for(int f: neighbor_b){
+        Eigen::Matrix<double,3,2> Tuv;
+        Tuv<<uv.row(F(f,0)),uv.row(F(f,1)),uv.row(F(f,2));
+        double e = autogen::sd_energy(Tuv,G_t);
+        valid = (isfinite(e) && !is_face_flipped(Tuv));
+        if(!valid) break;
+        E.push_back(e);
     }
-    return std::make_pair(valid,maxenergy);
+    if(!valid) continue;
+    double em = *(std::max_element(E.begin(),E.end()));
+    if(em < max_energy){
+        max_energy = em;
+        y = pt;
+    }
+  }
+  return std::make_pair(valid,max_energy);
 }
 
 using Action = std::tuple<int,int,Eigen::MatrixXi,std::vector<int>>;
@@ -413,88 +396,104 @@ bool insert_vertex_back(
   double total_area
 ){
   // for every action in the list
-    igl::Timer timer;
-    timer.start();
-    double total_time = 0.0;
-    int ii = 0;
-    //#define SHORTCUT
-    #ifdef SHORTCUT
-    // deserialize
-    std::string serial_name = "carter100";
-    igl::deserialize(ii,"ii",serial_name);
-    igl::deserialize(uv,"uv",serial_name);
-    igl::deserialize(F,"F",serial_name);
-    #endif
-    std::cout<<ii<<std::endl;
-    for(;ii<L.size();ii++){
-      double avg = domain_area / n_face;
-      double time1 = timer.getElapsedTime();
-      std::cout<<"rollback "<<ii<<"/"<<L.size()<<std::endl;
-      std::cout<<std::get<0>(L[ii])<<"(n) <-> "<<std::get<1>(L[ii])<<"(o)"<<std::endl;
-      auto a = L[ii];
-      Eigen::MatrixXi ring = std::get<2>(a);
-      std::vector<int> nbs = std::get<3>(a);
-        // position candidates
-        bool found = false;
-        Eigen::RowVector2d pos;
-        double maxenergy = std::numeric_limits<double>::max();
-        
-        Eigen::MatrixXd cd;
-        int v0 = std::get<1>(a); // v0 -> existing vertex
-        int v1 = std::get<0>(a); // v1 -> new vertex
-        auto uv_store = uv;
-        uv.row(v1) = uv.row(v0);
-        auto F_store = F;
-        for(int j=0;j<nbs.size();j++)
-            F.row(nbs[j])<<ring.row(j);
-        double angle_sum_of_v0 = calculate_angle_sum(ring,uv,v0,v1);
-        if(angle_sum_of_v0 < igl::PI)
-            std::swap(v0,v1);
-        find_candidate_positions(uv,ring,v1,v0,cd);
-        std::cout<<"try pos: "<<cd.rows()<<std::endl;
-        for(int j=0;j<cd.rows();j++){
-            Eigen::RowVector2d y;
-            auto z = flip_avoid_line_search(V,uv,ring,v0,v1,cd.row(j),y,avg);
-            //std::cout<<"position "<<j<<": "<<std::get<0>(z)<<","<<std::get<1>(z)<<std::endl;
-            if(std::get<0>(z) == true && std::get<1>(z)<maxenergy){
-                found = true;
-                pos << y(0),y(1);
-                maxenergy = std::get<1>(z);
-            }
+  igl::Timer timer;
+  timer.start();
+  double total_time = 0.0;
+
+  int ii = 0;
+  //#define SHORTCUT
+  #ifdef SHORTCUT
+  // deserialize
+  std::string serial_name = "carter100";
+  igl::deserialize(ii,"ii",serial_name);
+  igl::deserialize(uv,"uv",serial_name);
+  igl::deserialize(F,"F",serial_name);
+  #endif
+
+  std::cout<<ii<<std::endl;
+  for(;ii<L.size();ii++){
+    
+    double avg = domain_area / n_face;
+    
+    double time1 = timer.getElapsedTime();
+    std::cout<<"rollback "<<ii<<"/"<<L.size()<<std::endl;
+    std::cout<<std::get<0>(L[ii])<<"(n) <-> "<<std::get<1>(L[ii])<<"(o)"<<std::endl;
+    
+    Action ac = L[ii];
+    Eigen::MatrixXi ring = std::get<2>(ac);
+    std::vector<int> nbs = std::get<3>(ac);
+    
+    bool found = false;
+    // position candidates
+    Eigen::RowVector2d pos;
+    double max_energy = std::numeric_limits<double>::max();
+
+    int v0 = std::get<1>(ac); // v0 -> existing vertex
+    int v1 = std::get<0>(ac); // v1 -> new vertex
+    
+    // save faces for insertion failure
+    auto uv_store = uv;
+    auto F_store = F;
+
+    // restore collapsed
+    uv.row(v1) = uv.row(v0);
+    for(int j=0;j<nbs.size();j++)
+      F.row(nbs[j])<<ring.row(j);
+    // pick the valid sector with angle less than PI
+    double angle_sum_of_v0 = calculate_angle_sum(ring,uv,v0,v1);
+    if(angle_sum_of_v0 < igl::PI)
+      std::swap(v0,v1);
+    
+    Eigen::MatrixXd cd;
+    find_candidate_positions(uv,ring,v1,v0,cd);
+    std::cout<<"try pos: "<<cd.rows()<<std::endl;
+    for(int j=0;j<cd.rows();j++){
+        Eigen::RowVector2d q;
+        Eigen::RowVector2d x;
+        x << cd(j,0),cd(j,1);
+        auto r = flip_avoid_line_search(uv,ring,v0,v1,x,q,avg);
+        bool succ  = std::get<0>(r);
+        double e_m = std::get<1>(r);
+        found = (found || succ);
+        if(succ && max_energy > e_m){
+          max_energy = e_m;
+          pos = q;
         }
-        auto drop_empty_faces = [](
-          const Eigen::MatrixXi& F,
-          Eigen::MatrixXi& Fn
-        ){
-          Fn = F;
-          int k=0;
-          for(int i=0;i<F.rows();i++){
-            if(F.row(i).sum()!=0)
-              Fn.row(k++) << F.row(i);
-          }
-          Fn.conservativeResize(k,3);
-        };
-        if(found){
-          n_face += 2;
-          std::cout<<"current face size "<<n_face<<"/"<<F.rows()<<std::endl;
-          uv.row(v1) << pos;
-          Eigen::MatrixXi Ft;
-          drop_empty_faces(F,Ft);
-          local_smoothing(V,Ft,B,uv,20,1e10);
-        }else{
-          F = F_store;
-          uv = uv_store;
-          Eigen::MatrixXi Ft;
-          drop_empty_faces(F,Ft);
-          local_smoothing(V,Ft,B,uv,100,1e10);
-          ii--;
-        }
-        double time2 = timer.getElapsedTime();
-        total_time += (time2 - time1);
-        double expect_total_time = (total_time / (ii+1)) * L.size();
-        std::cout<<"expect time: "<<(expect_total_time-total_time)/60.0<<" mins "<<std::endl;
-    } 
-    return true;
+    }
+
+    auto drop_empty_faces = [](const Eigen::MatrixXi& F, Eigen::MatrixXi& Fn){
+      Fn = F;
+      int k=0;
+      for(int i=0;i<F.rows();i++){
+        if(F.row(i).sum()!=0)
+          Fn.row(k++) << F.row(i);
+      }
+      Fn.conservativeResize(k,3);
+    };
+
+    if(found){
+      n_face += 2;
+      std::cout<<"current face size "<<n_face<<"/"<<F.rows()<<std::endl;
+      uv.row(v1) << pos;
+      Eigen::MatrixXi Ft;
+      drop_empty_faces(F,Ft);
+      local_smoothing(V,Ft,B,uv,20,1e10);
+    }else{
+      F = F_store;
+      uv = uv_store;
+      Eigen::MatrixXi Ft;
+      drop_empty_faces(F,Ft);
+      local_smoothing(V,Ft,B,uv,100,1e10);
+      ii--;
+    }
+
+    double time2 = timer.getElapsedTime();
+    total_time += (time2 - time1);
+    double expect_total_time = (total_time / (ii+1)) * L.size();
+    std::cout<<"expect time: "<<(expect_total_time-total_time)/60.0<<" mins "<<std::endl;
+
+  } 
+  return true;
 }
 
 void check_result(

@@ -131,14 +131,22 @@ bool edge_collapse_is_valid(
 
     auto collect_vertices = [&](vector<int>& NF, VectorXi& v){
         vector<int> NV,uNV;
+        std::set<int> NS;
         for(auto f : NF) {
-            NV.push_back(F(f,0));
-            NV.push_back(F(f,1));
-            NV.push_back(F(f,2));
+            // NV.push_back(F(f,0));
+            // NV.push_back(F(f,1));
+            // NV.push_back(F(f,2));
+            NS.insert(F(f,0));
+            NS.insert(F(f,1));
+            NS.insert(F(f,2));
         }
-        vector<size_t> _1,_2;
-        igl::unique(NV,uNV,_1,_2);
-        igl::list_to_matrix(uNV,v);
+        v.resize(NS.size());
+        int i=0;
+        for(auto x: NS)
+          v(i++) = x;
+        // vector<size_t> _1,_2;
+        // igl::unique(NV,uNV,_1,_2);
+        // igl::list_to_matrix(uNV,v);
     };
 
     // check flip

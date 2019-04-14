@@ -10,7 +10,6 @@ void grad_to_eqtri(
   Tx<<0,0,0,h,0,0,h/2.,(std::sqrt(3)/2.)*h,0;
   Eigen::Matrix<double,3,3> gx;
   grad_operator(Tx,gx);
-  G_t.resize(3,2);
   G_t = gx.topRows(2);
 }
 
