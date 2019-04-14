@@ -4,7 +4,7 @@
 #include <igl/map_vertices_to_circle.h>
 #include <igl/harmonic.h>
 #include "progressive_embedding.h"
-#include "flipped_elements.h"
+#include "validity_check.h"
 #include "plot.h"
 #include "loader.h"
 #include "argh.h"

@@ -33,11 +33,11 @@ add_subdirectory(${THIRD_PARTY_DIR}/tbb tbb)
 target_compile_definitions(tbb_static PUBLIC -DUSE_TBB)
 
 add_library(progressive_embedding 
-local_operation.cpp    
+local_operation.cpp
+validity_check.cpp
 progressive_embedding.cpp
-local_smooth/energy.cpp
-local_smooth/auto_grad.cpp    
-local_smooth/coloring_mesh.cpp 
+local_smooth/auto_grad.cpp
+local_smooth/coloring_mesh.cpp
 local_smooth/local_smooth.cpp)
 
 add_library(shor_van_wyck 
@@ -53,7 +53,6 @@ set(MATCHMAKER_FILES
     matchmaker.cpp
     mst.cpp
     decompose_polygon.cpp
-    flipped_elements.cpp
     embed_points.cpp
     plot.cpp
     loader.cpp
@@ -61,7 +60,6 @@ set(MATCHMAKER_FILES
 
 set(MAPTOCONVEX_FILES
   map_to_convex.cpp
-  flipped_elements.cpp
   plot.cpp
   loader.cpp
 )

@@ -1,35 +1,22 @@
 #include "progressive_embedding.h"
-#include <Eigen/Dense>
 #include "local_operation.h"
-#include "local_smooth/energy.h"
-#include <queue>
-#include <igl/triangle_triangle_adjacency.h>
-#include <igl/opengl/glfw/Viewer.h>
-#include <igl/copyleft/cgal/orient2D.h>
-#include "plot.h"
+#include "validity_check.h"
+#include "local_smooth/local_smooth.h"
+#include "local_smooth/auto_grad.hpp"
+#include <igl/boundary_loop.h>
+#include <igl/slice.h>
 
-#include <igl/remove_unreferenced.h>
+#include "plot.h"
+#include <igl/opengl/glfw/Viewer.h>
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
-#include "local_smooth/local_smooth.h"
-#include <math.h>
-#include <igl/slim.h>
-#include <igl/writeOFF.h>
 #include <igl/Timer.h>
-#include <igl/linprog.h>
+
 #include <limits>
-#include "local_smooth/auto_grad.hpp"
-#define LOG
+#include <Eigen/Dense>
 
 double domain_area = 0.0;
 int n_face = 0;
-
-bool is_face_flipped(const Eigen::Matrix<double,3,2>& T){
-  double a[2] = {T(0,0),T(0,1)};
-  double b[2] = {T(1,0),T(1,1)};
-  double c[2] = {T(2,0),T(2,1)};
-  return igl::copyleft::cgal::orient2D(a,b,c) <= 0;
-}
 
 bool is_face_valid(
   const Eigen::Matrix<double,2,3>& G_t,
@@ -311,8 +298,7 @@ void collapse_invalid_elements(
   int layer = 0;
   while(num_invalid!=0){
     bool do_collapse = false;
-    Eigen::VectorXi updated(F.rows());
-    updated.setZero();
+    Eigen::VectorXi updated = Eigen::VectorXi::Zero(F.rows());
     for(int f=0;f<I.rows();f++){
       if(I(f)==0) continue;
       for(int k=0;k<3;k++){
@@ -354,15 +340,15 @@ void collapse_invalid_elements(
     // also collapse its layer 1...k neighbors
     std::set<int> W;
     for(int i=0;i<I.rows();i++){
-        if(I(i)==0) continue;
-        std::set<int> N;
-        neighbor_k_ring(uv,F,dEF,i,layer,N);
-        for(int n: N)
-          W.insert(n);
+      if(I(i)==0) continue;
+      std::set<int> N;
+      neighbor_k_ring(uv,F,dEF,i,layer,N);
+      for(int n: N)
+        W.insert(n);
     }
     for(int s: W){
-        if(B(F(s,0))+B(F(s,1))+B(F(s,2)) < 2)
-          I(s) = 1;
+      if(B(F(s,0))+B(F(s,1))+B(F(s,2)) < 2)
+        I(s) = 1;
     }
   }
 }
@@ -456,7 +442,7 @@ bool insert_vertex_back(
       uv.row(v1) << pos;
       Eigen::MatrixXi Ft;
       drop_empty_faces(F,Ft);
-      local_smoothing(V,Ft,B,uv,20,1e10,avg);
+      local_smoothing(V,Ft,B,uv,10,1e10,avg);
     }else{
       F = F_store;
       uv = uv_store;
@@ -482,7 +468,7 @@ void check_result(
 ){
   // [ check result ]
   Eigen::VectorXi T;
-  count_flipped_element(uv,F,T);
+  flipped_elements(uv,F,T);
   std::cout<<"flipped: "<<T.sum()<<std::endl;
   Eigen::VectorXd A;
   Eigen::MatrixXi Fn=F;
