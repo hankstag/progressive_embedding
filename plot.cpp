@@ -8,7 +8,7 @@ void plot_polygon(
   const Eigen::MatrixXd& poly
 ){
   viewer.data().clear();
-  viewer.core().align_camera_center(poly);
+  // viewer.core().align_camera_center(poly);
   for(int i=0;i<poly.rows();i++){
     int i_1 = (i+1) % poly.rows();
     viewer.data().add_label(poly.row(i),std::to_string(i));
@@ -30,7 +30,7 @@ void plot_mesh(
 ){
   viewer.data().clear();
   viewer.data().set_mesh(V,F);
-  viewer.core().align_camera_center(V,F);
+  // viewer.core().align_camera_center(V,F);
   Eigen::MatrixXd C(F.rows(),3);
   C.setConstant(1);
   if(show_boundary){

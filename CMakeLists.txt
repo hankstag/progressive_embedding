@@ -12,7 +12,7 @@ option(LIBIGL_WITH_OPENGL_GLFW_IMGUI "Use ImGui"          ON)
 
 find_package(LIBIGL REQUIRED QUIET)
 
-set(THIRD_PARTY_DIR ${CMAKE_SOURCE_DIR}/ext)
+set(THIRD_PARTY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ext)
 include(DownloadProject)
 download_project(
     PROJ         tbb
@@ -45,8 +45,8 @@ shor.cpp
 is_simple_polygon.cpp
 plot.cpp)
 
-set(MATCHMAKER_FILES
-    main.cpp
+
+add_library(match_maker
     edge_split.cpp
     path_tracing.cpp
     target_polygon.cpp
@@ -65,12 +65,16 @@ set(MAPTOCONVEX_FILES
 )
 
 
-add_executable(matchmaker_bin ${MATCHMAKER_FILES})
+add_executable(matchmaker_bin main.cpp)
+
 add_executable(convex_bin ${MAPTOCONVEX_FILES})
-target_link_libraries(progressive_embedding igl::core igl::triangle igl::opengl_glfw igl::cgal igl::opengl_glfw_imgui tbb_static)
-target_link_libraries(shor_van_wyck igl::core igl::triangle igl::cgal igl::opengl_glfw igl::opengl_glfw_imgui)
+target_link_libraries(progressive_embedding PUBLIC igl::core igl::triangle igl::opengl_glfw igl::cgal igl::opengl_glfw_imgui tbb_static)
+target_link_libraries(shor_van_wyck PUBLIC igl::core igl::triangle igl::cgal igl::opengl_glfw igl::opengl_glfw_imgui)
 target_include_directories(progressive_embedding SYSTEM PUBLIC ${THIRD_PARTY_DIR}/tbb/include)
 
-target_link_libraries(matchmaker_bin progressive_embedding shor_van_wyck)
-target_link_libraries(convex_bin progressive_embedding shor_van_wyck)
+target_link_libraries(match_maker PUBLIC progressive_embedding shor_van_wyck)
+target_include_directories(match_maker PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+target_link_libraries(matchmaker_bin match_maker)
+target_link_libraries(convex_bin PUBLIC progressive_embedding shor_van_wyck)
 
