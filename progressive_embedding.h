@@ -27,7 +27,13 @@ int expand_to_boundary(
   const Eigen::VectorXi& B,
   const Eigen::MatrixXi& dEF_s,
   const int fid,
-  Eigen::MatrixXi& local_F
+  Eigen::VectorXi& local_F
+);
+
+void check_result(
+  const Eigen::MatrixXd& uv,
+  const Eigen::MatrixXi& F,
+  const Eigen::Matrix<double,2,3>& G
 );
 
 #endif

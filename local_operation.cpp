@@ -166,8 +166,10 @@ bool edge_collapse_is_valid(
     if((dEF(ae,1) == -1 && Nint.size() == 3) ||
        (dEF(ae,1) != -1 && Nint.size() == 4))
         valid = true;
-    Ns.insert(Ns.begin(),Nd.begin(),Nd.end());
-    NF = Ns;
+    if(valid){
+      Ns.insert(Ns.begin(),Nd.begin(),Nd.end());
+      NF = Ns;
+    }
     // std::sort(NF.begin(),NF.end());
     // NF.erase( std::unique(NF.begin(),NF.end()),NF.end());
     // int f0 = dEF(ae,0);

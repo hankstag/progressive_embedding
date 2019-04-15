@@ -197,7 +197,8 @@ std::pair<bool,double> flip_avoid_line_search(
   int b,
   const Eigen::RowVector2d& x, // initial guess for b is (x+a)/2
   Eigen::RowVector2d& y,       // output position
-  double target_area
+  double target_area,
+  double eps
 ){
   double t = 1.0;
   int MAX_IT = 75;
@@ -213,7 +214,7 @@ std::pair<bool,double> flip_avoid_line_search(
   }
   Eigen::Matrix<double,2,3> G_t;
   grad_to_eqtri(target_area,G_t);
-  
+
   for(int it = 0;it<MAX_IT;it++){
     Eigen::RowVector2d pt;
     pt(0) = (1-t)*uv(a0,0)+t*x(0);
@@ -227,7 +228,7 @@ std::pair<bool,double> flip_avoid_line_search(
         Eigen::Matrix<double,3,2> Tuv;
         Tuv<<uv.row(F(f,0)),uv.row(F(f,1)),uv.row(F(f,2));
         double e = autogen::sd_energy(Tuv,G_t);
-        valid = (isfinite(e) && !is_face_flipped(Tuv));
+        valid = (std::isfinite(e) && !is_face_flipped(Tuv));
         if(!valid) break;
         E.push_back(e);
     }
@@ -238,6 +239,7 @@ std::pair<bool,double> flip_avoid_line_search(
         y = pt;
     }
   }
+  if(max_energy > eps)  valid = false;
   return std::make_pair(valid,max_energy);
 }
 
@@ -358,7 +360,7 @@ bool insert_vertex_back(
   const Eigen::MatrixXd& V,
   Eigen::MatrixXi& F,
   Eigen::MatrixXd& uv,
-  double total_area
+  double eps
 ){
   // for every action in the list
   igl::Timer timer;
@@ -416,7 +418,7 @@ bool insert_vertex_back(
         Eigen::RowVector2d q;
         Eigen::RowVector2d x;
         x << cd(j,0),cd(j,1);
-        auto r = flip_avoid_line_search(uv,ring,v0,v1,x,q,avg);
+        auto r = flip_avoid_line_search(uv,ring,v0,v1,x,q,avg,eps);
         bool succ  = std::get<0>(r);
         double e_m = std::get<1>(r);
         found = (found || succ);
@@ -467,9 +469,6 @@ void check_result(
   const Eigen::Matrix<double,2,3>& G
 ){
   // [ check result ]
-  Eigen::VectorXi T;
-  flipped_elements(uv,F,T);
-  std::cout<<"flipped: "<<T.sum()<<std::endl;
   Eigen::VectorXd A;
   Eigen::MatrixXi Fn=F;
   int k=0;
@@ -489,6 +488,9 @@ void check_result(
     E(i) = autogen::sd_energy(T,G);
   }
   std::cout<<"max energy "<<E.maxCoeff()<<std::endl;
+  Eigen::VectorXi T;
+  flipped_elements(uv,Fn,T);
+  std::cout<<"flipped: "<<T.sum()<<std::endl;
 }
 
 bool progressive_embedding(
@@ -542,7 +544,7 @@ bool progressive_embedding(
 
   // [ invert vertex in reverse order of L ]
   std::reverse(L.begin(),L.end());
-  insert_vertex_back(L,B,V,F,uv,area_total);
+  insert_vertex_back(L,B,V,F,uv,eps);
   
   igl::opengl::glfw::Viewer vr;
   vr.data().set_mesh(uv,F);

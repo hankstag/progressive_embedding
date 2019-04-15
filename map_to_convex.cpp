@@ -39,14 +39,14 @@ int main(int argc, char *argv[])
   igl::map_vertices_to_circle(V,bd,circle);
   Eigen::MatrixXd H;
   igl::harmonic(F,bd,circle,1,H);
-  progressive_embedding(V,F,H,bd,circle,1e15);
+  progressive_embedding(V,F,H,bd,circle,1e20);
   #else 
   Eigen::VectorXi b;
   Eigen::MatrixXd bc;
   igl::boundary_loop(F,b);
   igl::slice(uv,b,1,bc);
   Eigen::VectorXi I;
-  count_flipped_element(uv,F,I);
+  flipped_elements(uv,F,I);
   std::cout<<"count flipped: "<<I.sum()<<std::endl;
   bool x = progressive_embedding(V,F,uv,b,bc,1e20);
   #endif

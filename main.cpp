@@ -12,43 +12,8 @@
 #include <igl/remove_unreferenced.h>
 #include <igl/copyleft/cgal/orient2D.h>
 
-// void test_local_smoothing(){
-//   Eigen::MatrixXi F(13,3);
-//   F<<0,1,2,
-//      3,2,1,
-//      2,4,5,
-//      6,7,2,
-//      8,6,9,
-//      10,9,2,
-//      2,11,0,
-//      10,2,12,
-//      12,2,5,
-//      2,3,4,
-//      2,7,11,
-//      9,6,2,
-//      8,7,6;
-//   Eigen::MatrixXd V(13,2);
-//   V<<                -39,            -9.8125,
-//                 -39,              -9.75,
-// -39.000000000000007,-9.9365594558871901,
-//                 -39,            -9.6875,
-//  -39.00001456174526,-9.9732687460454432,
-//                 -39,-10.421052631578947,
-// -39.000000000000007,-9.9365594558871901,
-//                 -39,            -9.9375,
-//                 -39,                -10,
-//                 -39,-10.105263157894736,
-//                 -39,-10.210526315789474,
-//                 -39,             -9.875,
-//                 -39,-10.315789473684211;
-//   double target_area = 0.432473;
-//   Eigen::VectorXi B(V.rows());
-//   Eigen::MatrixXd V0 = V;
-//   local_smoothing(V,F,B,V,10,1e10);
-//   std::cout<<"diff: "<<(V-V0).norm()<<std::endl;
-//   std::cout<<V<<std::endl;
-
-// }
+#include "validity_check.h"
+#include <igl/slim.h>
 
 void quadratic_func(
     const Eigen::Vector2d& s,
@@ -82,8 +47,6 @@ void perturb_curve(
     bool colinear = false;
     int count = 0;
     polygon_perturbed.resize(P.rows(),2);
-    Eigen::VectorXi corners(P.rows());
-    corners.setZero();
     // [should make sure vertex 0 is a corner point]
     for(int i=0;i<P.rows()+1;i++){
         int prev = (i-1+P.rows())%P.rows();
@@ -97,6 +60,7 @@ void perturb_curve(
             t_id = curr;
             colinear = true;
         }else{
+          // get angle betwen b-a and b-c
             // if its end point of colinear line
             if(colinear){
                 t_id = curr;
@@ -171,6 +135,7 @@ int main(int argc, char *argv[])
       std::cout<<"-b: whether use the boundary info in obj file"<<std::endl;
       exit(0);
   }
+  //test_local_smoothing();
   int loop, threshold;
   std::string model,uvfile;
   cmdl("-in") >> model;
@@ -225,7 +190,7 @@ int main(int argc, char *argv[])
   Eigen::VectorXi ci;
   Eigen::MatrixXd c;
   
-  #define SHORTCUT
+  //#define SHORTCUT
   #ifdef SHORTCUT
   std::string serial_name = "local_save_pb";
   igl::deserialize(V,"V",serial_name);
@@ -233,57 +198,7 @@ int main(int argc, char *argv[])
   igl::deserialize(F,"F",serial_name);
   igl::deserialize(ci,"bi",serial_name);
   igl::deserialize(c,"b",serial_name);
-  // Eigen::VectorXi EMAP,EE;
-  // Eigen::MatrixXi E,EF,EI;
-  // Eigen::MatrixXi dEF,dEI,allE;
-  // igl::edge_flaps(F,E,allE,EMAP,EF,EI,dEF,dEI,EE);
-  // Eigen::VectorXi B;
-  // B.setZero(V.rows());
-  // for(int i=0;i<ci.rows();i++)
-  //   B(ci(i)) = 1;
-  // std::set<int> lengths;
-  // for(int i=0;i<F.rows();i++){
-  //   Eigen::MatrixXi local_F,NF;
-  //   Eigen::MatrixXd local_V,NV,Nuv;
-  //   expand_to_boundary(V,F,B,dEF,i,local_F);
-  //   Eigen::VectorXi II;
-  //   igl::remove_unreferenced(V,local_F,NV,NF,II);
-  //   igl::remove_unreferenced(uv,local_F,Nuv,NF,II);
-  //   if(lengths.find(NF.rows())==lengths.end()){
-  //     Eigen::MatrixXd CN;
-  //     Eigen::MatrixXi FN;
-  //     igl::writeOBJ("patch"+std::to_string(i)+".obj",NV,NF,CN,FN,Nuv,NF);
-  //     Eigen::VectorXi FLIP;
-  //     count_flipped_element(Nuv,NF,FLIP);
-  //     if(FLIP.sum()!=0){
-  //       std::cout<<"patch "<<i<<" has #flipped: "<<FLIP.sum()<<std::endl;
-  //       igl::opengl::glfw::Viewer viewer;
-  //       viewer.data().set_mesh(NV,NF);
-  //       Eigen::VectorXi bb;
-  //       igl::boundary_loop(NF,bb);
-  //       Eigen::MatrixXd poly,npoly;
-  //       igl::slice(Nuv,bb,1,poly);
-  //       perturb_curve(poly,npoly);
-  //       igl::harmonic(NF ,bb,npoly,1,Nuv);
-  //       count_flipped_element(Nuv,NF,FLIP);
-  //       std::vector<Object> Os = {
-  //         Object(V,F,OTYPE::MESH),
-  //         Object(npoly,F,OTYPE::POLYGON)
-  //       };
-  //       plots(Os);
-  //       // for(int i=0;i<bb.rows();i++)
-  //       //   viewer.data().add_points(Nuv.row(bb(i)),Eigen::RowVector3d(1,0,0));
-  //       for(int i=0;i<FLIP.rows();i++){
-  //         if(FLIP(i)){
-  //           for(int k=0;k<3;k++)
-  //             viewer.data().add_points(NV.row(NF(i,k)),Eigen::RowVector3d(0,1,0));
-  //           }
-  //         }
-  //         viewer.launch();
-  //       }
-  //       lengths.insert(NF.rows());
-  //   }
-  // }
+  
   progressive_embedding(V,F,uv,ci,c,1e20);
   #endif
 
