@@ -7,95 +7,9 @@
 #include "plot.h"
 #include "loader.h"
 #include "argh.h"
-#include "cut_mesh/edge_flaps.h"
-#include "local_smooth/local_smooth.h"
-#include <igl/remove_unreferenced.h>
-#include <igl/copyleft/cgal/orient2D.h>
+#include "slim/slim.h"
 
 #include "validity_check.h"
-#include <igl/slim.h>
-
-void quadratic_func(
-    const Eigen::Vector2d& s,
-    const Eigen::Vector2d& t,
-    const Eigen::Vector2d& pos,
-    Eigen::Vector2d& result,
-    double eps
-){
-    Eigen::Vector2d direction = s-t;
-    Eigen::MatrixXd rotation(2,2);
-    rotation<<0,-1,
-              1, 0;
-    Eigen::Vector2d normal;
-    normal = (rotation * direction).normalized();
-    double length = (s-t).norm();
-    double ratio = (s-pos).norm()/length;
-    double a = -4*eps;
-    double b = 4*eps;
-    double offset = a*ratio*ratio+b*ratio;
-    normal = normal.array()*offset;
-    result = normal+pos;
-}
-
-void perturb_curve(
-    const Eigen::MatrixXd& P,
-    Eigen::MatrixXd& polygon_perturbed
-){
-    //for all consecutive colinear edges, map them to a bounding polynomial
-    int s_id = 0;
-    int t_id = 0;
-    bool colinear = false;
-    int count = 0;
-    polygon_perturbed.resize(P.rows(),2);
-    // [should make sure vertex 0 is a corner point]
-    for(int i=0;i<P.rows()+1;i++){
-        int prev = (i-1+P.rows())%P.rows();
-        int next = (i+1)%P.rows();
-        int curr = i % P.rows();
-        double a[2] = {P(prev,0),P(prev,1)};
-        double b[2] = {P(curr,0),P(curr,1)};
-        double c[2] = {P(next,0),P(next,1)};
-        short r = igl::copyleft::cgal::orient2D(a,b,c);
-        if(r == 0){ // colinear
-            t_id = curr;
-            colinear = true;
-        }else{
-          // get angle betwen b-a and b-c
-            // if its end point of colinear line
-            if(colinear){
-                t_id = curr;
-                Eigen::Vector2d s,t,result;
-                s<< P(s_id,0),P(s_id,1);
-                t<< P(t_id,0),P(t_id,1);
-                int k=(s_id+1)%P.rows();
-                while(k!=t_id){
-                    Eigen::Vector2d pos;
-                    pos<<P(k,0),P(k,1);
-                    double eps;
-                    quadratic_func(s,t,pos,result,eps);
-                    //std::cout<<eps<<std::endl;
-                    polygon_perturbed.row(count++)<<result(0),result(1);
-                    k = (k+1)%P.rows();
-                }
-                colinear = false;
-            }
-            s_id = curr;
-            if(i!=P.rows())
-                polygon_perturbed.row(count++)<<P(i,0),P(i,1);
-        }
-    }
-    polygon_perturbed.conservativeResize(count,2);
-    std::vector<std::pair<int,int>> edges;
-    for(int i=0;i<polygon_perturbed.rows();i++){
-        edges.push_back(std::make_pair(i,(i+1)%polygon_perturbed.rows()));
-    }
-    std::cout<<"polygon perturbed size "<<polygon_perturbed.rows()<<std::endl;
-    // std::cout<<std::setprecision(17)<<polygon_perturbed<<std::endl;
-    //Eigen::MatrixXi F_;
-    //display(polygon_perturbed,F_,edges,{},{},{});
-    
-}
-
 
 void random_internal_vertices(
   const Eigen::MatrixXd& V,
@@ -142,7 +56,7 @@ int main(int argc, char *argv[])
   cmdl("-uv") >> uvfile;
   // cmdl("-l",20) >> loop;
   // cmdl("-t",20) >> threshold;
-  #define QUAD
+  //#define QUAD
   #ifndef QUAD
   Eigen::MatrixXd V,polygon,uv;
   Eigen::MatrixXi F;
@@ -204,7 +118,34 @@ int main(int argc, char *argv[])
 
   match_maker(V,F,uv,c,ci,R,bd0,polygon);
   #endif
+  
+  igl::SLIMData sData;
+  sData.slim_energy = igl::SLIMData::SYMMETRIC_DIRICHLET;
+  igl::SLIMData::SLIM_ENERGY energy_type=igl::SLIMData::SYMMETRIC_DIRICHLET;
+  //Eigen::SparseMatrix<double> Aeq;
+  Eigen::VectorXd E;
+  slim_precompute(V,F,uv,sData,igl::SLIMData::SYMMETRIC_DIRICHLET,ci,c,0,true,E,1.0);
   igl::opengl::glfw::Viewer vr;
-  plot_mesh(vr,uv,F,{},Eigen::VectorXi());
-
+  auto key_down = [&](
+    igl::opengl::glfw::Viewer& viewer, unsigned char key, int modifier
+  ){
+    if (key == ' ') {
+      slim_solve(sData,20,E);
+      viewer.data().clear();
+      viewer.data().set_mesh(V,F);
+      viewer.data().set_uv(sData.V_o,F);
+      viewer.data().show_texture = true;
+    }
+    if(key == '1'){
+      slim_solve(sData,20,E);
+      viewer.data().clear();
+      viewer.data().set_mesh(sData.V_o,F);
+      std::cout<<sData.V_o.row(ci(1))<<std::endl;
+      viewer.data().show_texture = false;
+    }
+    return false;
+  };
+  vr.callback_key_down = key_down;
+  //plot_mesh(vr,uv,F,{},Eigen::VectorXi());
+  vr.launch();
 }

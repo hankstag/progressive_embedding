@@ -419,7 +419,7 @@ void match_maker(
   boundary_straightening(P);
   Eigen::VectorXi H(P.rows());
   H.setZero();
-  igl::opengl::glfw::Viewer vr;
+  //igl::opengl::glfw::Viewer vr;
   //plot_polygon(vr,H,P);
   remove_ears(V,F);
   // [ use Shor to get list of polygons ]

@@ -546,8 +546,8 @@ bool progressive_embedding(
   std::reverse(L.begin(),L.end());
   insert_vertex_back(L,B,V,F,uv,eps);
   
-  igl::opengl::glfw::Viewer vr;
-  vr.data().set_mesh(uv,F);
-  vr.launch();
+  // igl::opengl::glfw::Viewer vr;
+  // vr.data().set_mesh(uv,F);
+  // vr.launch();
   return true;
 }
