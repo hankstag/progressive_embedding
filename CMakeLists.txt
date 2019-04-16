@@ -64,13 +64,31 @@ set(MAPTOCONVEX_FILES
   loader.cpp
 )
 
+set(SEAMLESS_FILES
+    seamless_parametrization.cpp
+    edge_split.cpp
+    path_tracing.cpp
+    target_polygon.cpp
+    matchmaker.cpp
+    mst.cpp
+    decompose_polygon.cpp
+    embed_points.cpp
+    plot.cpp
+    loader.cpp
+    process_ee.cpp
+)
+
+find_package(Umfpack REQUIRED)
+
 
 add_executable(matchmaker_bin ${MATCHMAKER_FILES})
+add_executable(seamless_bin ${SEAMLESS_FILES})
 add_executable(convex_bin ${MAPTOCONVEX_FILES})
 target_link_libraries(progressive_embedding igl::core igl::triangle igl::opengl_glfw igl::cgal igl::opengl_glfw_imgui tbb_static)
 target_link_libraries(shor_van_wyck igl::core igl::triangle igl::cgal igl::opengl_glfw igl::opengl_glfw_imgui)
 target_include_directories(progressive_embedding SYSTEM PUBLIC ${THIRD_PARTY_DIR}/tbb/include)
 
-target_link_libraries(matchmaker_bin progressive_embedding shor_van_wyck)
+target_link_libraries(matchmaker_bin progressive_embedding shor_van_wyck umfpack)
 target_link_libraries(convex_bin progressive_embedding shor_van_wyck)
+target_link_libraries(seamless_bin progressive_embedding shor_van_wyck umfpack)
 

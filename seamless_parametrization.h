@@ -1,0 +1,7 @@
+#ifndef SEAMLESS_PARAMETRIZATION_H
+#define SEAMLESS_PARAMETRIZATION_H
+
+
+
+
+#endif

@@ -14,9 +14,11 @@
 namespace igl
 {  
 
-  // Act like the matlab X(row_indices,col_indices) operator, where
-  // row_indices, col_indices are non-negative integer indices. This is a fast version
-  // of igl::slice that can analyze and store the sparsity structure. It is slower at the // first evaluation (slice_cached_precompute), but faster on the subsequent ones.
+  // Act like the matlab X(row_indices,col_indices) operator, where row_indices,
+  // col_indices are non-negative integer indices. This is a fast version of
+  // igl::slice that can analyze and store the sparsity structure. It is slower
+  // at the irst evaluation (slice_cached_precompute), but faster on the
+  // subsequent ones.
   // 
   // Inputs:
   //   X  m by n matrix
@@ -39,24 +41,27 @@ namespace igl
   // // Fast version
   // static VectorXi data; // static or saved in a global state
   // if (data.size() == 0)
-  //   igl::slice_cached_precompute(L,in,in,L_sliced,data);
+  //   igl::slice_cached_precompute(L,in,in,data,L_sliced);
   // else
-  //   igl::slice_cached(L,L_sliced,temp);
+  //   igl::slice_cached(L,data,L_sliced);
 
-  template <typename TX, typename TY>
-  IGL_INLINE void slice_cached_precompute(
-    const Eigen::SparseMatrix<TX>& X,
-    const Eigen::Matrix<int,Eigen::Dynamic,1> & R,
-    const Eigen::Matrix<int,Eigen::Dynamic,1> & C,
-    Eigen::SparseMatrix<TY>& Y,
-    Eigen::VectorXi& data);
+template <typename TX, typename TY, typename DerivedI>
+IGL_INLINE void slice_cached_precompute(
+  const Eigen::SparseMatrix<TX>& X,
+  const Eigen::Matrix<int,Eigen::Dynamic,1> & R,
+  const Eigen::Matrix<int,Eigen::Dynamic,1> & C,
+  Eigen::MatrixBase<DerivedI>& data,
+  Eigen::SparseMatrix<TY>& Y
+  );
 
-  template <typename TX, typename TY>
-  IGL_INLINE void slice_cached(
-    const Eigen::SparseMatrix<TX>& X,
-    Eigen::SparseMatrix<TY>& Y,
-    const Eigen::VectorXi& data);
+template <typename TX, typename TY, typename DerivedI>
+IGL_INLINE void slice_cached(
+  const Eigen::SparseMatrix<TX>& X,
+  const Eigen::MatrixBase<DerivedI>& data,
+  Eigen::SparseMatrix<TY>& Y
+  );
 }
+
 #ifndef IGL_STATIC_LIBRARY
 #  include "slice_cached.cpp"
 #endif

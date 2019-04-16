@@ -122,25 +122,34 @@ int main(int argc, char *argv[])
   igl::SLIMData sData;
   sData.slim_energy = igl::SLIMData::SYMMETRIC_DIRICHLET;
   igl::SLIMData::SLIM_ENERGY energy_type=igl::SLIMData::SYMMETRIC_DIRICHLET;
-  //Eigen::SparseMatrix<double> Aeq;
-  Eigen::VectorXd E;
-  slim_precompute(V,F,uv,sData,igl::SLIMData::SYMMETRIC_DIRICHLET,ci,c,0,true,E,1.0);
+  Eigen::SparseMatrix<double> Aeq;
+  Aeq.resize(ci.rows()*2,uv.rows()*2);
+  Eigen::VectorXd rb(ci.rows()*2);
+  for(int i=0;i<ci.rows();i++){
+    Aeq.coeffRef(2*i  ,ci(i))           = 1;
+    Aeq.coeffRef(2*i+1,ci(i)+uv.rows()) = 1;
+    rb(2*i) = uv(ci(i),0);
+    rb(2*i+1) = uv(ci(i),1);
+  }
+  slim_precompute(V,F,uv,sData,igl::SLIMData::SYMMETRIC_DIRICHLET,ci,c,Aeq,rb,0);
+  //slim_precompute(V,F,uv,sData,igl::SLIMData::SYMMETRIC_DIRICHLET,ci,c,0,true,E,Aeq,rb,1.0);
   igl::opengl::glfw::Viewer vr;
   auto key_down = [&](
     igl::opengl::glfw::Viewer& viewer, unsigned char key, int modifier
   ){
     if (key == ' ') {
-      slim_solve(sData,20,E);
+      slim_solve(sData,20);
       viewer.data().clear();
       viewer.data().set_mesh(V,F);
       viewer.data().set_uv(sData.V_o,F);
+      viewer.core().align_camera_center(V);
       viewer.data().show_texture = true;
     }
     if(key == '1'){
-      slim_solve(sData,20,E);
+      slim_solve(sData,20);
       viewer.data().clear();
       viewer.data().set_mesh(sData.V_o,F);
-      std::cout<<sData.V_o.row(ci(1))<<std::endl;
+      viewer.core().align_camera_center(sData.V_o);
       viewer.data().show_texture = false;
     }
     return false;

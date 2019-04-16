@@ -45,7 +45,6 @@ struct SLIMData
   Eigen::VectorXi b;
   Eigen::MatrixXd bc;
   double soft_const_p;
-  bool is_hard_cstr;
 
   double exp_factor; // used for exponential energies, ignored otherwise
   bool mesh_improvement_3d; // only supported for 3d
@@ -55,7 +54,6 @@ struct SLIMData
   double energy; // objective value
 
   // INTERNAL
-  int exp_iter=0;
   Eigen::VectorXd M;
   double mesh_area;
   double avg_edge_length;
@@ -74,26 +72,8 @@ struct SLIMData
   bool first_solve;
   bool has_pre_calc = false;
   int dim;
-
-  // cached for solving linear system
-  Eigen::VectorXi I;
-  Eigen::VectorXi fi;
-  Eigen::VectorXi ci;
-  Eigen::VectorXi D1;
-  Eigen::VectorXi D2;
-  Eigen::VectorXd fixed_pos;
-
-  Eigen::VectorXi data1;
-  Eigen::VectorXi data2;
-  Eigen::VectorXi data3;
-  Eigen::VectorXi data4;
-
-  Eigen::SparseMatrix<double> Af;
-  Eigen::SparseMatrix<double> Aff;
-  Eigen::SparseMatrix<double> Afc;
-
   Eigen::SparseMatrix<double> Aeq;
-
+  Eigen::VectorXd rb;
   #ifdef SLIM_CACHED
   Eigen::SparseMatrix<double> A;
   Eigen::VectorXi A_data;
@@ -118,17 +98,14 @@ IGL_INLINE void slim_precompute(
   SLIMData::SLIM_ENERGY slim_energy,
   Eigen::VectorXi& b,
   Eigen::MatrixXd& bc,
-  double soft_p,
-  bool is_hard_cstr,
-  Eigen::VectorXd& E,
   const Eigen::SparseMatrix<double>& Aeq,
-  double exp_factor
-);
+  const Eigen::VectorXd& rb,
+  double soft_p);
 
 // Run iter_num iterations of SLIM
 // Outputs:
 //    V_o (in SLIMData): #V by dim list of mesh vertex positions
-IGL_INLINE Eigen::MatrixXd slim_solve(SLIMData& data, int iter_num,Eigen::VectorXd& E);
+IGL_INLINE Eigen::MatrixXd slim_solve(SLIMData& data, int iter_num);
 
 } // END NAMESPACE
 
