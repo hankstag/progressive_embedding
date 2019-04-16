@@ -64,8 +64,9 @@ set(MAPTOCONVEX_FILES
   loader.cpp
 )
 
-
 add_executable(matchmaker_bin ${MATCHMAKER_FILES})
+add_executable(scaf_bin scaf_main.cpp loader.cpp)
+
 add_executable(convex_bin ${MAPTOCONVEX_FILES})
 target_link_libraries(progressive_embedding igl::core igl::triangle igl::opengl_glfw igl::cgal igl::opengl_glfw_imgui tbb_static)
 target_link_libraries(shor_van_wyck igl::core igl::triangle igl::cgal igl::opengl_glfw igl::opengl_glfw_imgui)
@@ -73,4 +74,5 @@ target_include_directories(progressive_embedding SYSTEM PUBLIC ${THIRD_PARTY_DIR
 
 target_link_libraries(matchmaker_bin progressive_embedding shor_van_wyck)
 target_link_libraries(convex_bin progressive_embedding shor_van_wyck)
+target_link_libraries(scaf_bin progressive_embedding shor_van_wyck)
 
