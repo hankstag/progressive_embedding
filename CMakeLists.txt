@@ -56,7 +56,9 @@ add_library(match_maker
     embed_points.cpp
     plot.cpp
     loader.cpp
+    dijkstra.cpp
 )
+
 
 set(MAPTOCONVEX_FILES
   map_to_convex.cpp
