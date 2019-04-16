@@ -5,7 +5,7 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License
 // v. 2.0. If a copy of the MPL was not distributed with this file, You can
 // obtain one at http://mozilla.org/MPL/2.0/.
-#include "slim.h"
+#include "slim_lag.h"
 
 #include <igl/boundary_loop.h>
 #include <igl/cotmatrix.h>
@@ -23,10 +23,8 @@
 #include <igl/slice_into.h>
 #include <igl/volume.h>
 #include <igl/polar_svd.h>
-#include <igl/setdiff.h>
-#include <igl/slice.h>
-#include "slice_cached.h"
 #include <igl/flip_avoiding_line_search.h>
+//#include <Eigen/UmfPackSupport>
 
 #include <iostream>
 #include <map>
@@ -37,9 +35,10 @@
 #include <Eigen/SparseCholesky>
 #include <Eigen/IterativeLinearSolvers>
 
-#include <igl/Timer.h>
+#include "Timer.h"
 #include "sparse_cached.h"
-//#define CHOLMOD
+#include "AtA_cached.h"
+
 #ifdef CHOLMOD
 #include <Eigen/CholmodSupport>
 #endif
@@ -63,13 +62,13 @@ namespace igl
     IGL_INLINE double compute_energy_with_jacobians(igl::SLIMData& s,
                                                     const Eigen::MatrixXd &V,
                                                     const Eigen::MatrixXi &F, const Eigen::MatrixXd &Ji,
-                                                    Eigen::MatrixXd &uv, Eigen::VectorXd &areas, Eigen::VectorXd& E);
+                                                    Eigen::MatrixXd &uv, Eigen::VectorXd &areas);
     IGL_INLINE void solve_weighted_arap(igl::SLIMData& s,
                                         const Eigen::MatrixXd &V,
                                         const Eigen::MatrixXi &F,
                                         Eigen::MatrixXd &uv,
                                         Eigen::VectorXi &soft_b_p,
-                                        Eigen::MatrixXd &soft_bc_p,bool use_lag);
+                                        Eigen::MatrixXd &soft_bc_p);
     IGL_INLINE void update_weights_and_closest_rotations( igl::SLIMData& s,
                                                           const Eigen::MatrixXd &V,
                                                           const Eigen::MatrixXi &F,
@@ -77,22 +76,7 @@ namespace igl
     IGL_INLINE void compute_jacobians(igl::SLIMData& s, const Eigen::MatrixXd &uv);
     IGL_INLINE void build_linear_system(igl::SLIMData& s, Eigen::SparseMatrix<double> &L);
     IGL_INLINE void pre_calc(igl::SLIMData& s);
-    IGL_INLINE void solve_lagrange(
-        const Eigen::SparseMatrix<double>& H,
-        const Eigen::SparseMatrix<double>& Aeq,
-        const Eigen::VectorXd& c,
-        const Eigen::VectorXi& bi,
-        const Eigen::VectorXd& b,
-        Eigen::VectorXd& sol
-    );
-    IGL_INLINE void solve( // solving using row/col removal
-        const Eigen::SparseMatrix<double>& H,
-        const Eigen::SparseMatrix<double>& Aeq,
-        const Eigen::VectorXd& c,
-        const Eigen::VectorXi& bi,
-        const Eigen::VectorXd& b,
-        Eigen::VectorXd& sol
-      );
+
     // Implementation
     IGL_INLINE void compute_surface_gradient_matrix(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F,
                                                     const Eigen::MatrixXd &F1, const Eigen::MatrixXd &F2,
@@ -109,83 +93,6 @@ namespace igl
       D2 = F2.col(0).asDiagonal() * Dx + F2.col(1).asDiagonal() * Dy + F2.col(2).asDiagonal() * Dz;
     }
 
-      IGL_INLINE void solve(
-              Eigen::VectorXi& data1,
-              Eigen::VectorXi& data2,
-              Eigen::VectorXi& data3,
-              Eigen::SparseMatrix<double>& Af,
-              Eigen::SparseMatrix<double>& Aff,
-              Eigen::SparseMatrix<double>& Afc,
-              const Eigen::VectorXi& fi,
-              const Eigen::VectorXi& ci,
-              Eigen::VectorXi& D1,
-              Eigen::VectorXi& D2,
-              const Eigen::SparseMatrix<double>& A,
-              const Eigen::VectorXd& xc,
-              const Eigen::VectorXd& rhs,
-              Eigen::VectorXd& sol
-      ){
-          //std::cout<<"using row/col removal"<<std::endl;
-          // solving linear system with linear constraints
-          // using row/col removal
-          igl::Timer t;
-          t.start();
-          auto start = t.getElapsedTime();
-          Eigen::VectorXd new_rhs;
-          igl::slice(rhs,fi,1,new_rhs);
-
-          if(data1.size()==0){
-            igl::slice_cached_precompute(A,fi,D1,Af,data1);
-          }else{
-            //Af.resize(fi.rows(),D1.rows());
-            igl::slice_cached(A,Af,data1);
-          }
-          if(data2.size()==0){
-            igl::slice_cached_precompute(Af,D2,fi,Aff,data2);
-          }else{
-            igl::slice_cached(Af,Aff,data2);
-          }
-          if(data3.size()==0){
-            igl::slice_cached_precompute(Af,D2,ci,Afc,data3);
-          }else{
-            igl::slice_cached(Af,Afc,data3);
-          }
-          //igl::slice(A,fi,D1,Af);
-          //igl::slice(A,ci,D1,Ac);
-          
-          // igl::slice(Af,D2,fi,Aff);
-          // igl::slice(Af,D2,ci,Afc);
-
-          auto slice_end = t.getElapsedTime();
-          //#define TIME_PROFILE
-          #ifdef TIME_PROFILE
-          std::cout<<"slicing time: "<<slice_end - start<<std::endl;
-          #endif
-          Afc.makeCompressed();
-          Aff.makeCompressed();
-          new_rhs = new_rhs-Afc*xc;
-          auto before_solve = t.getElapsedTime();
-          #ifndef CHOLMOD
-          Eigen::SimplicialLDLT<Eigen::SparseMatrix<double> > solver;
-          Eigen::VectorXd xf = solver.compute(Aff).solve(new_rhs);
-          #else
-          Eigen::CholmodSimplicialLDLT<Eigen::SparseMatrix<double> > solver;
-          Eigen::VectorXd xf = solver.compute(Aff).solve(new_rhs);
-          #endif
-          auto after_solve = t.getElapsedTime();
-          #ifdef TIME_PROFILE          
-          std::cout<<"solve time: "<<after_solve - before_solve<<std::endl;
-          #endif
-          sol.resize(A.cols());
-          for(int i=0;i<ci.rows();i++) // constant
-              sol(ci(i))=xc(i);
-          for(int i=0;i<fi.rows();i++){ // free
-              sol(fi(i))=xf(i);
-          }
-          // auto after_solve = t.getElapsedTime();
-          // std::cout<<"solve "<<after_solve - after_slice<<std::endl;
-      }
-
     IGL_INLINE void solve_lagrange(
         const Eigen::SparseMatrix<double>& H,
         const Eigen::SparseMatrix<double>& Aeq,
@@ -193,42 +100,7 @@ namespace igl
         const Eigen::VectorXi& bi,
         const Eigen::VectorXd& b,
         Eigen::VectorXd& sol
-    ){
-      if(bi.rows()==0){
-        Eigen::SimplicialLDLT<Eigen::SparseMatrix<double> > solver;
-        sol = solver.compute(H).solve(c);
-        return;
-      }
-      int neq = Aeq.rows();   // number of constraints
-      Eigen::SparseMatrix<double> new_A;
-      Eigen::VectorXd rhs(c.rows()+b.rows());
-      Eigen::SparseMatrix<double> AeqT = Aeq.transpose();
-      Eigen::SparseMatrix<double> Z(neq,neq);
-      // This is a bit slower. But why isn't cat fast?
-      new_A = igl::cat(1, igl::cat(2,   H, AeqT ),
-                     igl::cat(2, Aeq,    Z ));
-      rhs << c,
-             b;
-      new_A.makeCompressed();
-      #ifndef CHOLMOD
-      Eigen::SimplicialLDLT<Eigen::SparseMatrix<double> > solver;
-      sol = solver.compute(new_A).solve(rhs);
-      #else
-      Eigen::CholmodSimplicialLDLT<Eigen::SparseMatrix<double> > solver;
-      sol = solver.compute(new_A).solve(rhs);
-      #endif
-
-      //Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower | Eigen::Upper> solver;
-      // test solver
-//      Eigen::VectorXd p = new_A*sol-rhs;
-//      //std::cout<<p.norm()/rhs.norm()<<std::endl;
-//      for(int i=0;i<bi.rows();i++){
-//        sol(bi(i)) = b(i);
-//      }
-      // using row/col removal instead?
-
-    }
-
+    );
 
     IGL_INLINE void compute_jacobians(igl::SLIMData& s, const Eigen::MatrixXd &uv)
     {
@@ -252,6 +124,58 @@ namespace igl
         s.Ji.col(7) = s.Dy * uv.col(2);
         s.Ji.col(8) = s.Dz * uv.col(2);
       }
+    }
+
+    IGL_INLINE void solve_lagrange(
+        const Eigen::SparseMatrix<double>& H,
+        const Eigen::SparseMatrix<double>& Aeq,
+        const Eigen::VectorXd& RHS,
+        Eigen::VectorXd& sol
+    ){
+      int neq = Aeq.rows();   // number of constraints
+      Eigen::SparseMatrix<double> new_A;
+      Eigen::VectorXd rhs;
+      rhs.setZero(H.rows()+Aeq.rows());
+      Eigen::SparseMatrix<double> AeqT = Aeq.transpose();
+      Eigen::SparseMatrix<double> Z(neq,neq);
+      // This is a bit slower. But why isn't cat fast?
+      new_A = igl::cat(1, igl::cat(2,   H, AeqT ),
+                     igl::cat(2, Aeq,    Z ));
+      new_A.makeCompressed();
+      rhs.topRows(RHS.rows()) = RHS;
+      //#define UMFPACK
+      #ifdef UMFPACK
+      Eigen::UmfPackLU<Eigen::SparseMatrix<double>> solver;
+      solver.analyzePattern(new_A);
+      solver.compute(new_A);
+      sol = solver.solve(rhs);
+      #else
+      #ifndef CHOLMOD
+      Eigen::SimplicialLDLT<Eigen::SparseMatrix<double> > solver;
+      sol = solver.compute(new_A).solve(rhs);
+      std::cout<<"norm = "<<(new_A*sol-rhs).norm()<<std::endl;
+
+        Eigen::VectorXd Uc;
+        Uc=sol.block(0,0,Aeq.cols(),1);
+        Eigen::SparseMatrix<double> t = Uc.sparseView();
+        t.makeCompressed();
+        Eigen::SparseMatrix<double> mm = Aeq*t;
+        Eigen::VectorXd z = Eigen::VectorXd(mm);
+        std::cout<<"max violation "<<z.cwiseAbs().maxCoeff()<<std::endl;
+      #else
+      Eigen::CholmodSimplicialLDLT<Eigen::SparseMatrix<double> > solver;
+      sol = solver.compute(new_A).solve(rhs);
+      #endif
+      #endif
+      //Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower | Eigen::Upper> solver;
+      // test solver
+//      Eigen::VectorXd p = new_A*sol-rhs;
+//      //std::cout<<p.norm()/rhs.norm()<<std::endl;
+//      for(int i=0;i<bi.rows();i++){
+//        sol(bi(i)) = b(i);
+//      }
+      // using row/col removal instead?
+
     }
 
     IGL_INLINE void update_weights_and_closest_rotations(igl::SLIMData& s,
@@ -539,53 +463,41 @@ namespace igl
       using namespace Eigen;
 
       Eigen::SparseMatrix<double> L;
+      build_linear_system(s,L);
+
       igl::Timer t;
       
       //t.start();
-      //auto start_build = t.getElapsedTime();
-      build_linear_system(s,L);
-      //auto end_build = t.getElapsedTime();
-      //std::cout<<"building linear system time: "<<end_build-start_build<<std::endl;
-      
       // solve
       Eigen::VectorXd Uc;
+#ifndef CHOLMOD
       if (s.dim == 2)
       {
-        if(!s.is_hard_cstr){
-          SimplicialLDLT<Eigen::SparseMatrix<double> > solver;
-          Uc = solver.compute(L).solve(s.rhs);
-        }else{
-          solve(s.data1,s.data2,s.data3,s.Af,s.Aff,s.Afc,s.fi,s.ci,s.D1,s.D2,L,s.fixed_pos,s.rhs,Uc);
-        }
+        // SimplicialLDLT<Eigen::SparseMatrix<double> > solver;
+        // Uc = solver.compute(L).solve(s.rhs);
+        VectorXd xx;
+        solve_lagrange(L,s.Aeq,s.rhs,xx);
+        Uc=xx.block(0,0,2*V.rows(),1);
       }
       else
       { // seems like CG performs much worse for 2D and way better for 3D
-        if(!s.is_hard_cstr||soft_b_p.rows()==0){
-          Eigen::VectorXd guess(uv.rows() * s.dim);
-          for (int i = 0; i < s.v_num; i++) for (int j = 0; j < s.dim; j++) guess(uv.rows() * j + i) = uv(i, j); // flatten vector
-          ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower | Upper> solver;
-          solver.setTolerance(1e-8);
-          Uc = solver.compute(L).solveWithGuess(s.rhs, guess);
-        }else{
-          VectorXd bc=VectorXd::Zero(soft_bc_p.rows()*s.dim);
-          VectorXi b=VectorXi::Zero(soft_bc_p.rows()*s.dim);
-          if(soft_b_p.rows()!=0){
-            b<<soft_b_p,soft_b_p.array()+V.rows(),soft_b_p.array()+2*V.rows();
-            bc<<soft_bc_p.col(0),soft_bc_p.col(1),soft_bc_p.col(2);
-          }
-          SparseMatrix<double> Aeq(b.rows(),s.dim*V.rows());
-          for(int r=0;r<b.rows();r++){
-            Aeq.insert(r,b(r))=1;
-          }
-          Aeq.makeCompressed();
-          VectorXd xx;
-          solve_lagrange(L,Aeq,s.rhs,b,bc,xx);
-          Uc=xx.block(0,0,3*V.rows(),1);
-        }
+        Eigen::VectorXd guess(uv.rows() * s.dim);
+        for (int i = 0; i < s.v_num; i++) for (int j = 0; j < s.dim; j++) guess(uv.rows() * j + i) = uv(i, j); // flatten vector
+        ConjugateGradient<Eigen::SparseMatrix<double>, Lower | Upper> cg;
+        cg.setTolerance(1e-8);
+        cg.compute(L);
+        Uc = cg.solveWithGuess(s.rhs, guess);
       }
-
+#else
+        CholmodSimplicialLDLT<Eigen::SparseMatrix<double> > solver;
+        Uc = solver.compute(L).solve(s.rhs);
+#endif
       for (int i = 0; i < s.dim; i++)
         uv.col(i) = Uc.block(i * s.v_n, 0, s.v_n, 1);
+
+      // t.stop();
+      // std::cerr << "solve: " << t.getElapsedTime() << std::endl;
+
     }
 
 
@@ -658,10 +570,10 @@ namespace igl
       if (s.A.rows() == 0)
       {
         s.A = Eigen::SparseMatrix<double>(s.dim * s.dim * s.f_n, s.dim * s.v_n);
-        igl::sparse_cached_precompute(IJV,s.A,s.A_data);
+        igl::sparse_cached_precompute(IJV,s.A_data,s.A);
       }
       else
-        igl::sparse_cached(IJV,s.A,s.A_data);
+        igl::sparse_cached(IJV,s.A_data,s.A);
       #else
       Eigen::SparseMatrix<double> A(s.dim * s.dim * s.f_n, s.dim * s.v_n);
       buildA(s,IJV);
@@ -687,9 +599,9 @@ namespace igl
       #ifdef SLIM_CACHED
       s.AtA_data.W = s.WGL_M;
       if (s.AtA.rows() == 0)
-        igl::AtA_cached_precompute(s.A,s.AtA,s.AtA_data);
+        igl::AtA_cached_precompute(s.A,s.AtA_data,s.AtA);
       else
-        igl::AtA_cached(s.A,s.AtA,s.AtA_data);
+        igl::AtA_cached(s.A,s.AtA_data,s.AtA);
 
       L = s.AtA + s.proximal_p * id_m; //add also a proximal 
       L.makeCompressed();
@@ -705,9 +617,9 @@ namespace igl
       buildRhs(s, A);
       #endif
 
-      // Eigen::SparseMatrix<double> OldL = L;
-      // add_soft_constraints(s,L);
-      // L.makeCompressed();
+      Eigen::SparseMatrix<double> OldL = L;
+      add_soft_constraints(s,L);
+      L.makeCompressed();
     }
 
     IGL_INLINE void add_soft_constraints(igl::SLIMData& s, Eigen::SparseMatrix<double> &L)
@@ -724,10 +636,10 @@ namespace igl
       }
     }
 
-    IGL_INLINE double compute_energy(igl::SLIMData& s, Eigen::MatrixXd &V_new, Eigen::VectorXd& E)
+    IGL_INLINE double compute_energy(igl::SLIMData& s, Eigen::MatrixXd &V_new)
     {
       compute_jacobians(s,V_new);
-      return compute_energy_with_jacobians(s, s.V, s.F, s.Ji, V_new, s.M, E) +
+      return compute_energy_with_jacobians(s, s.V, s.F, s.Ji, V_new, s.M) +
              compute_soft_const_energy(s, s.V, s.F, V_new);
     }
 
@@ -747,11 +659,10 @@ namespace igl
     IGL_INLINE double compute_energy_with_jacobians(igl::SLIMData& s,
                                                     const Eigen::MatrixXd &V,
                                                     const Eigen::MatrixXi &F, const Eigen::MatrixXd &Ji,
-                                                    Eigen::MatrixXd &uv, Eigen::VectorXd &areas, Eigen::VectorXd& E)
+                                                    Eigen::MatrixXd &uv, Eigen::VectorXd &areas)
     {
 
       double energy = 0;
-      E.resize(s.f_n);
       if (s.dim == 2)
       {
         Eigen::Matrix<double, 2, 2> ji;
@@ -770,43 +681,41 @@ namespace igl
           double s1 = sing(0);
           double s2 = sing(1);
 
-          double e = 0;
           switch (s.slim_energy)
           {
             case igl::SLIMData::ARAP:
             {
-              e = areas(i) * (pow(s1 - 1, 2) + pow(s2 - 1, 2));
+              energy += areas(i) * (pow(s1 - 1, 2) + pow(s2 - 1, 2));
               break;
             }
             case igl::SLIMData::SYMMETRIC_DIRICHLET:
             {
-              e = areas(i) * (pow(s1, 2) + pow(s1, -2) + pow(s2, 2) + pow(s2, -2));
+              energy += areas(i) * (pow(s1, 2) + pow(s1, -2) + pow(s2, 2) + pow(s2, -2));
               break;
             }
             case igl::SLIMData::EXP_SYMMETRIC_DIRICHLET:
             {
-              e = areas(i) * exp(s.exp_factor * (pow(s1, 2) + pow(s1, -2) + pow(s2, 2) + pow(s2, -2)));
+              energy += areas(i) * exp(s.exp_factor * (pow(s1, 2) + pow(s1, -2) + pow(s2, 2) + pow(s2, -2)));
               break;
             }
             case igl::SLIMData::LOG_ARAP:
             {
-              e = areas(i) * (pow(log(s1), 2) + pow(log(s2), 2));
+              energy += areas(i) * (pow(log(s1), 2) + pow(log(s2), 2));
               break;
             }
             case igl::SLIMData::CONFORMAL:
             {
-              e = areas(i) * ((pow(s1, 2) + pow(s2, 2)) / (2 * s1 * s2));
+              energy += areas(i) * ((pow(s1, 2) + pow(s2, 2)) / (2 * s1 * s2));
               break;
             }
             case igl::SLIMData::EXP_CONFORMAL:
             {
-              e = areas(i) * exp(s.exp_factor * ((pow(s1, 2) + pow(s2, 2)) / (2 * s1 * s2)));
+              energy += areas(i) * exp(s.exp_factor * ((pow(s1, 2) + pow(s2, 2)) / (2 * s1 * s2)));
               break;
             }
 
           }
-          energy += e;
-          E(i) = e;
+
         }
       }
       else
@@ -1053,19 +962,15 @@ namespace igl
 /// Slim Implementation
 
 IGL_INLINE void igl::slim_precompute(
-  const Eigen::MatrixXd &V,
-  const Eigen::MatrixXi &F,
-  const Eigen::MatrixXd &V_init,
+  const Eigen::MatrixXd &V, 
+  const Eigen::MatrixXi &F, 
+  const Eigen::MatrixXd &V_init, 
   SLIMData &data,
-  SLIMData::SLIM_ENERGY slim_energy,
-  Eigen::VectorXi &b,
+  SLIMData::SLIM_ENERGY slim_energy, 
+  Eigen::VectorXi &b, 
   Eigen::MatrixXd &bc,
-  double soft_p,
-  bool is_hard_cstr,
-  Eigen::VectorXd& E,
   const Eigen::SparseMatrix<double>& Aeq,
-  double exp_factor
-)
+  double soft_p)
 {
 
   data.V = V;
@@ -1080,52 +985,23 @@ IGL_INLINE void igl::slim_precompute(
   data.b = b;
   data.bc = bc;
   data.soft_const_p = soft_p;
-  data.is_hard_cstr = is_hard_cstr;
-
+  data.Aeq = Aeq;
   data.proximal_p = 0.0001;
 
   igl::doublearea(V, F, data.M);
   data.M /= 2.;
   data.mesh_area = data.M.sum();
   data.mesh_improvement_3d = false; // whether to use a jacobian derived from a real mesh or an abstract regular mesh (used for mesh improvement)
-  data.exp_factor = exp_factor; // param used only for exponential energies (e.g exponential symmetric dirichlet)
+  data.exp_factor = 1.0; // param used only for exponential energies (e.g exponential symmetric dirichlet)
 
   assert (F.cols() == 3 || F.cols() == 4);
 
   igl::slim::pre_calc(data);
-  data.energy = igl::slim::compute_energy(data,data.V_o,E) / data.mesh_area;
-
-  data.Aeq = Aeq;
-
-  int n = b.rows();
-  // the size of linear system
-  int R = data.v_num*data.dim;
-  int C = data.v_num*data.dim;
-  Eigen::VectorXi I;
-  Eigen::VectorXi T=Eigen::VectorXi::LinSpaced(C,0,C-1);
-  data.fixed_pos = Eigen::VectorXd::Zero(data.bc.rows()*data.dim);
-  data.ci = Eigen::VectorXi::Zero(data.b.rows()*data.dim);
-  if(data.bc.rows()!=0){
-    data.fixed_pos<<data.bc.col(0),data.bc.col(1);
-    if(data.dim == 3)
-      data.ci<<data.b,data.b.array()+data.v_num,data.b.array()+2*data.v_num;
-    else
-      data.ci<<data.b,data.b.array()+data.v_num;
-  }
-  if(n==0)
-    data.fi = T;
-  else
-    igl::setdiff(T,data.ci,data.fi,I);
-  data.D1 = Eigen::VectorXi::LinSpaced(C,0,C-1);
-  data.D2 = Eigen::VectorXi::LinSpaced(data.fi.rows(),0,data.fi.rows()-1);
-  // data.fixed_pos = Eigen::VectorXd::Zero(data.bc.rows()*data.dim);
-  // if(data.bc.rows()!=0){
-  //   data.fixed_pos<<data.bc.col(0),data.bc.col(1);
-  // }
+  data.energy = igl::slim::compute_energy(data,data.V_o) / data.mesh_area;
 }
-IGL_INLINE Eigen::MatrixXd igl::slim_solve(SLIMData &data, int iter_num, Eigen::VectorXd& E)
+
+IGL_INLINE Eigen::MatrixXd igl::slim_solve(SLIMData &data, int iter_num)
 {
-  double energy_ratio = 1.0;
   for (int i = 0; i < iter_num; i++)
   {
     Eigen::MatrixXd dest_res;
@@ -1134,29 +1010,14 @@ IGL_INLINE Eigen::MatrixXd igl::slim_solve(SLIMData &data, int iter_num, Eigen::
     // Solve Weighted Proxy
     igl::slim::update_weights_and_closest_rotations(data,data.V, data.F, dest_res);
     igl::slim::solve_weighted_arap(data,data.V, data.F, dest_res, data.b, data.bc);
-   
+
     double old_energy = data.energy;
 
     std::function<double(Eigen::MatrixXd &)> compute_energy = [&](
-        Eigen::MatrixXd &aaa) { return igl::slim::compute_energy(data,aaa,E); };
+        Eigen::MatrixXd &aaa) { return igl::slim::compute_energy(data,aaa); };
 
     data.energy = igl::flip_avoiding_line_search(data.F, data.V_o, dest_res, compute_energy,
                                                  data.energy * data.mesh_area) / data.mesh_area;
-    //std::cout.precision(17);
-    
-    if(data.slim_energy == igl::SLIMData::EXP_CONFORMAL || data.slim_energy == igl::SLIMData::EXP_SYMMETRIC_DIRICHLET) {
-      while (std::isnan(data.energy) || std::isinf(data.energy) || (data.energy > 1e15)) {
-          std::cout<<"using factor "<<data.exp_factor<<std::endl;
-          data.exp_factor /= 3;
-          data.energy = igl::flip_avoiding_line_search(data.F, data.V_o, dest_res, compute_energy,
-                                                       data.energy * data.mesh_area) / data.mesh_area;
-      }
-      if(data.exp_iter>50){
-        data.exp_factor *= 2;
-        data.exp_iter = 0;
-      }
-      data.exp_iter++;
-    }
   }
   return data.V_o;
 }
