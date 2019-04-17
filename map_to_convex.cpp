@@ -9,15 +9,6 @@
 #include "loader.h"
 #include "argh.h"
 #include <igl/segment_segment_intersect.h>
-
-void convexation(
-  Eigen::MatrixXd& uv,
-  const Eigen::MatrixXi& F
-){
-  Eigen::VectorXi bd;
-  igl::boundary_loop(F,bd);
-  Eigen::MatrixXd polygon(bd.rows(),3);
-  
   // auto strech = [](
   //   Eigen::RowVector2d p0,
   //   Eigen::RowVector2d v0,
@@ -60,6 +51,42 @@ void convexation(
   //   std::cout<<" to sample: "<<N<<std::endl;
   // };
   
+void convexation(
+  Eigen::MatrixXd& uv,
+  const Eigen::MatrixXi& F
+){
+  Eigen::VectorXi bd;
+  igl::boundary_loop(F,bd);
+  Eigen::MatrixXd polygon(bd.rows(),3);
+  auto strech = [](
+    Eigen::RowVector2d p0_2d,
+    Eigen::RowVector2d v0_2d,
+    Eigen::RowVector2d v1_2d,
+    Eigen::RowVector2d p1_2d,
+    int N,
+    double scale,
+    Eigen::RowVector2d center,
+    Eigen::MatrixXd& polyline
+  ){
+    Eigen::RowVector3d p0;
+    p0 << p0_2d,0;
+    Eigen::RowVector3d v0;
+    v0 << v0_2d,0;
+    Eigen::RowVector3d v1;
+    v1 << v1_2d,0;
+    Eigen::RowVector3d p1;
+    p1 << p1_2d,0;
+    Eigen::RowVector3d p0v0 = v0-p0;
+    Eigen::RowVector3d p1v1 = v1-p1;
+    double u,v;
+    bool cross = igl::segment_segment_intersect(p0,p0v0,p1,p1v1,u,v,1e10);
+    Eigen::RowVector3d joint;
+    joint = p0 + p0v0*u;
+    Eigen::RowVector3d jt_v0 = v0-joint;
+    Eigen::RowVector3d jt_v1 = v1-joint;
+    double angle = std::acos(jt_v0.dot(jt_v1));
+    std::cout<<angle<<std::endl;
+  };
   auto is_corner = [](
     const Eigen::RowVector2d& vi,
     const Eigen::RowVector2d& vx,
@@ -101,9 +128,10 @@ void convexation(
       b = uv.row(bd(c0));
       c = uv.row(bd(c1));
       d = uv.row(bd((c1+1)%n));
-      sample_vertices(a,b,c,d,(c1-c0+1+n)%n,polyline);
-      for(int j=0;j<polyline.rows();j++)
-        polygon.row((j+c0)%n) << polyline.row(j);
+      strech(a,b,c,d,(c1-c0+1+n)%n,0.01,center,polyline);
+      // sample_vertices(a,b,c,d,(c1-c0+1+n)%n,polyline);
+      // for(int j=0;j<polyline.rows();j++)
+      //   polygon.row((j+c0)%n) << polyline.row(j);
       igl::opengl::glfw::Viewer viewer;
       viewer.data().set_mesh(uv,F);
       viewer.data().add_points(b,Eigen::RowVector3d(1,1,0));
