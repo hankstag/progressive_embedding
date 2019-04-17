@@ -93,16 +93,16 @@ namespace igl {
   //
   template <typename IndexType, typename DerivedV, typename DerivedF,
   typename DerivedD, typename DerivedP>
-  IGL_INLINE ivoid igl::dijkstra(
+  IGL_INLINE int dijkstra(
     const Eigen::MatrixBase<DerivedV> &V,
     const Eigen::MatrixBase<DerivedF> &F,
     const std::vector<std::vector<IndexType> >& VV,
     const IndexType &source,
     const std::set<IndexType> &targets,
     Eigen::PlainObjectBase<DerivedD> &min_distance,
-    Eigen::PlainObjectBase<DerivedP> &previous)
-};
+    Eigen::PlainObjectBase<DerivedP> &previous);
 
+}
 
 #ifndef IGL_STATIC_LIBRARY
 #include "dijkstra.cpp"

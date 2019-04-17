@@ -56,7 +56,6 @@ add_library(match_maker
     embed_points.cpp
     plot.cpp
     loader.cpp
-    dijkstra.cpp
 )
 
 

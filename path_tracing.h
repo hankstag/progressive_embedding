@@ -1,8 +1,8 @@
 #ifndef PATH_TRACING_H
 #define PATH_TRACING_H
 
-#include <igl/dijkstra.h>
 #include <igl/adjacency_list.h>
+#include <set>
 
 // tracing path in mesh
 void path_tracing(

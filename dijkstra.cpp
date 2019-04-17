@@ -83,7 +83,7 @@ IGL_INLINE void igl::dijkstra(
 
 template <typename IndexType, typename DerivedV, typename DerivedF,
 typename DerivedD, typename DerivedP>
-IGL_INLINE void igl::dijkstra(
+IGL_INLINE int igl::dijkstra(
   const Eigen::MatrixBase<DerivedV> &V,
   const Eigen::MatrixBase<DerivedF> &F,
   const std::vector<std::vector<IndexType> >& VV,
@@ -93,7 +93,6 @@ IGL_INLINE void igl::dijkstra(
   Eigen::PlainObjectBase<DerivedP> &previous)
 {
   int numV = VV.size();
-  if (numV ==0) igl::adjacency_list(F,VV);
   numV = VV.size();
 
   min_distance.setConstant(numV, 1, std::numeric_limits<typename DerivedD::Scalar>::infinity());
@@ -130,6 +129,7 @@ IGL_INLINE void igl::dijkstra(
 
     }
   }
+  return -1;
 }
 
 #ifdef IGL_STATIC_LIBRARY
