@@ -98,3 +98,63 @@ void load_matching_info(
         }
     }
 }
+
+//jiaran
+void load_in(const std::string model,
+             Eigen::MatrixXd& V,
+             Eigen::MatrixXi& F,
+             Eigen::MatrixXd& polygon,
+             Eigen::VectorXi& bd,
+             Eigen::VectorXi& R)
+{
+    Eigen::MatrixXd uv,CN;
+    Eigen::MatrixXi Fuv,FN;
+    igl::readOBJ(model,V,uv,CN,F,Fuv,FN);
+    if(uv.rows()!=0){
+        Eigen::MatrixXd nV(uv.rows(),3);
+        for(int i=0;i<F.rows();i++){
+            nV.row(Fuv(i,0)) << V.row(F(i,0));
+            nV.row(Fuv(i,1)) << V.row(F(i,1));
+            nV.row(Fuv(i,2)) << V.row(F(i,2));
+        }
+        F = Fuv;
+        V = nV;
+    }
+    igl::boundary_loop(F,bd);
+    if(uv.rows()!=0)
+        igl::slice(uv,bd,1,polygon);
+    
+    FILE * file = fopen(model.c_str(),"r");
+#define LINE_MAX 2048
+    char line[LINE_MAX];
+    Eigen::VectorXi RI;
+    RI.setZero(V.rows());
+    
+    while (fgets(line, LINE_MAX, file) != NULL)
+    {
+        char type[LINE_MAX];
+        
+        if(sscanf(line, "%s",type) == 1)
+        {
+            char * l = &line[strlen(type)];
+            
+            if(strlen(type) >= 1)
+            {
+                if (type[0] == 'r')
+                {
+                    int x[2];
+                    int count = sscanf(l,"%d %d\n",&x[0],&x[1]);
+                    RI(x[0]-1) = x[1];
+                }
+            }
+        }
+        
+        //else: ignore empty line
+    }
+    
+    fclose(file);
+    
+    R.setZero(bd.rows());
+    for (int i=0; i<bd.rows(); i++)
+        R(i) = RI(bd(i));
+}

@@ -27,4 +27,12 @@ void load_matching_info(
     std::pair<int,int>& match
 );
 
+//jiaran
+void load_in(const std::string model,
+             Eigen::MatrixXd& V,
+             Eigen::MatrixXi& F,
+             Eigen::MatrixXd& polygon,
+             Eigen::VectorXi& bd,
+             Eigen::VectorXi& R);
+
 #endif

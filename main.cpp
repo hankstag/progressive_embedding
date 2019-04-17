@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
   cmdl("-uv") >> uvfile;
   // cmdl("-l",20) >> loop;
   // cmdl("-t",20) >> threshold;
-  //#define QUAD
+  #define QUAD
   #ifndef QUAD
   Eigen::MatrixXd V,polygon,uv;
   Eigen::MatrixXi F;
@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
   match_maker(V,F,uv,c,ci,R,T,polys[0]);
   #else
   // load model and uv
-  Eigen::MatrixXd V,uv,polygon;
+/*Eigen::MatrixXd V,uv,polygon;
   Eigen::MatrixXi F,Fuv;
   Eigen::VectorXi bd0,bd1;
   load_model_with_seam(model,V,F,polygon,bd0);
@@ -97,7 +97,20 @@ int main(int argc, char *argv[])
   std::cout<<"setting rotation index..."<<std::endl;
   set_rotation_index(uv,Fuv,R,offset);
   assert(bd0.rows()==bd1.rows());
-
+*/
+    //jiaran
+    Eigen::MatrixXd V,uv,polygon;
+    Eigen::MatrixXi F;
+    Eigen::VectorXi bd0,R;
+    
+    load_in(model,V,F,polygon,bd0,R);
+    for (int i=0; i<R.rows(); i++)
+    {
+        if(R(i)!=0)
+            std::cout<<i<<"-"<<bd0(i)<<":"<<R(i)<<std::endl;
+    }
+    
+    
   igl::opengl::glfw::Viewer viewer1;
   //plot_mesh(viewer1,V,F,{},true);
 
