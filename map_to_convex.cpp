@@ -18,51 +18,47 @@ void convexation(
   igl::boundary_loop(F,bd);
   Eigen::MatrixXd polygon(bd.rows(),3);
   
-  auto sample_vertices = [](
-    Eigen::RowVector2d p0_2d,
-    Eigen::RowVector2d v0_2d,
-    Eigen::RowVector2d v1_2d,
-    Eigen::RowVector2d p1_2d,
-    int N,
-    Eigen::MatrixXd& polyline
-  ){
+  // auto strech = [](
+  //   Eigen::RowVector2d p0,
+  //   Eigen::RowVector2d v0,
+  //   Eigen::RowVector2d v1,
+  //   Eigen::RowVector2d p1,
+  //   int N,
+  //   double scale,
+  //   Eigen::RowVector2d center,
+  //   Eigen::MatrixXd& polyline
+  // ){
     
-    Eigen::RowVector3d p0;
-    p0 << p0_2d,0;
-    Eigen::RowVector3d v0;
-    v0 << v0_2d,0;
-    Eigen::RowVector3d v1;
-    v1 << v1_2d,0;
-    Eigen::RowVector3d p1;
-    p1 << p1_2d,0;
+  //   polyline.resize(N,2);
+  //   for(int i=0;i<polyline.rows();i++){
+      
+  //   }
     
-    polyline.resize(N,3);
-    Eigen::RowVector3d p0v0 = v0-p0;
-    Eigen::RowVector3d p1v1 = v1-p1;
+  //   Eigen::RowVector3d p0v0 = v0-p0;
+  //   Eigen::RowVector3d p1v1 = v1-p1;
     
-    double u,v;
-    bool cross = igl::segment_segment_intersect(p0,p0v0,p1,p1v1,u,v,1e10);
-    Eigen::RowVector3d joint;
-    joint = p0 + p0v0*u;
-    Eigen::RowVector3d v0v1;
-    v0v1 << v1-v0;
-    Eigen::RowVector3d nm;
-    nm << 0,0,1;
-    Eigen::RowVector3d dir = v0v1.cross(nm);
-    double max_h = std::min((v0-joint).dot(dir),1.0);
-    if(!cross) max_h = 1e-1;
-    Eigen::RowVector3d mid_p = (v0+v1)*.5 + dir*max_h*.5;
-    for(int i=0;i<polyline.rows();i++){
-      double t = 1.0*i/N;
-      std::cout<<t<<std::endl;
-      polyline.row(i) << (1-t)*(1-t)*v0 + t*t*v1 + 2*t*(1-t)*mid_p;
-    }
-    // igl::opengl::glfw::Viewer viewer;
-    // for(int i=0;i<polyline.rows();i++)
-    //   viewer.data().add_points(polyline.row(i),Eigen::RowVector3d(1,0,0));
-    // viewer.launch();
-    std::cout<<" to sample: "<<N<<std::endl;
-  };
+  //   double u,v;
+  //   bool cross = igl::segment_segment_intersect(p0,p0v0,p1,p1v1,u,v,1e10);
+  //   Eigen::RowVector3d joint;
+  //   joint = p0 + p0v0*u;
+  //   Eigen::RowVector3d v0v1;
+  //   v0v1 << v1-v0;
+  //   Eigen::RowVector3d nm;
+  //   nm << 0,0,1;
+  //   Eigen::RowVector3d dir = v0v1.cross(nm);
+  //   double max_h = std::min((v0-joint).dot(dir),1.0);
+  //   if(!cross) max_h = 1e-1;
+  //   Eigen::RowVector3d mid_p = (v0+v1)*.5 + dir*max_h*.5;
+  //   for(int i=0;i<polyline.rows();i++){
+  //     double t = 1.0*i/N;
+  //     polyline.row(i) << (1-t)*(1-t)*v0 + t*t*v1 + 2*t*(1-t)*mid_p;
+  //   }
+  //   // igl::opengl::glfw::Viewer viewer;
+  //   // for(int i=0;i<polyline.rows();i++)
+  //   //   viewer.data().add_points(polyline.row(i),Eigen::RowVector3d(1,0,0));
+  //   // viewer.launch();
+  //   std::cout<<" to sample: "<<N<<std::endl;
+  // };
   
   auto is_corner = [](
     const Eigen::RowVector2d& vi,
@@ -129,11 +125,6 @@ void convexation(
     Object(uv,F,OTYPE::MESH)
   };
   plots(Os);
-  
-  
-  // for(int i=0;i<polygon.rows();i++){
-  //   viewer.data().add_points(polygon.row(i),Eigen::RowVector3d(1,0,0));
-  // }
   
 }
 
