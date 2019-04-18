@@ -658,6 +658,6 @@ void match_maker(
     // std::vector<int> S;
     // test_flip(H1,F,S);
     //bool succ = progressive_fix(ci,nb,nbc,V,F,H1);
-    bool succ = progressive_embedding(V,F,H1,nb,nbc,1e100);
+    bool succ = progressive_embedding(V,F,H1,nb,nbc,1e20);
     uv = H1;
 }

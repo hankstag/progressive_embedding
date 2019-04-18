@@ -53,5 +53,5 @@ int main(int argc, char *argv[])
 
   igl::opengl::glfw::Viewer vr;
   plot_mesh(vr,uv,F,{},Eigen::VectorXi());
-
+  vr.launch();
 }

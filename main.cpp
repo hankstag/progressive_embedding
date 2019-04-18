@@ -80,9 +80,14 @@ int main(int argc, char *argv[])
     Eigen::VectorXi bd0,R,ci;
     
 //#define LOADIN
-#ifdef LOADIN
-    load_in(model,V,F,polygon,bd0,R);
-#else    
+//#ifdef LOADIN
+    Eigen::MatrixXd polygon2;
+    Eigen::MatrixXd V2;
+    Eigen::MatrixXi F2;
+    Eigen::VectorXi bd2;
+    Eigen::VectorXi R2;
+    load_in(model,V2,F2,polygon2,bd2,R2);
+//#else    
     Eigen::MatrixXd _polygon;
     Eigen::MatrixXi Fuv;
     Eigen::VectorXi bd1;
@@ -105,13 +110,13 @@ int main(int argc, char *argv[])
     std::cout<<"setting rotation index..."<<std::endl;
     set_rotation_index(uv,Fuv,R,offset);
     assert(bd0.rows()==bd1.rows());
-#endif
+//#endif
     
     std::cout<<"rotation index:"<<std::endl;
-    for (int i=0; i<R.rows(); i++)
+    for (int i=0; i<R2.rows(); i++)
     {
-        if(R(i)!=0)
-            std::cout<<i<<"-"<<bd0(i)<<":"<<R(i)<<std::endl;
+        if(R2(i)!=0)
+            std::cout<<i<<"-"<<bd0(i)<<":"<<R2(i)<<std::endl;
     }
     
     //#define SHORTCUT
@@ -135,9 +140,20 @@ int main(int argc, char *argv[])
     std::cout<<"R:"<<R.rows()<<"*"<<R.cols()<<std::endl;
     std::cout<<"bd0:"<<bd0.rows()<<"*"<<bd0.cols()<<std::endl;
     std::cout<<"polygon:"<<polygon.rows()<<"*"<<polygon.cols()<<std::endl;
-    for(int i=0;i<polygon.rows();i++)
-        std::cout<<polygon.row(i)<<std::endl;
-    
+    std::cout<<" === "<<std::endl;
+    std::cout<<std::setprecision(17)<<(V-V2).norm()<<std::endl;
+    std::cout<<std::setprecision(17)<<(R-R2).norm()<<std::endl;
+    std::cout<<std::setprecision(17)<<(polygon-polygon2).norm()<<std::endl;
+    std::cout<<" === "<<std::endl;    
+    for(int i=0;i<R.rows();i++){
+      if(R(i)!=R2(i)){
+        std::cout<<i<<": "<<R(i)<<", "<<R2(i)<<std::endl;
+      }
+    }
+    uv.resize(10,2);
+    uv.setZero();
+    // for(int i=0;i<polygon.rows();i++)
+    //     std::cout<<std::setprecision(17)<<polygon.row(i)<<std::endl;
     match_maker(V,F,uv,c,ci,R,bd0,polygon);
 #endif
     

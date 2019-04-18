@@ -5,6 +5,7 @@
 #include "local_smooth/auto_grad.hpp"
 #include <igl/boundary_loop.h>
 #include <igl/slice.h>
+#include <igl/remove_unreferenced.h>
 
 #include "plot.h"
 #include <igl/opengl/glfw/Viewer.h>
@@ -445,11 +446,51 @@ bool insert_vertex_back(
       Eigen::MatrixXi Ft;
       drop_empty_faces(F,Ft);
       local_smoothing(V,Ft,B,uv,10,1e10,avg);
+      Eigen::Matrix<double,2,3> G_t;
+      grad_to_eqtri(avg,G_t);
+      check_result(uv,Ft,G_t);
     }else{
       F = F_store;
       uv = uv_store;
       Eigen::MatrixXi Ft;
       drop_empty_faces(F,Ft);
+      Eigen::VectorXi I;
+      flipped_elements(uv,Ft,I);
+      Eigen::VectorXi EMAP,EE;
+      Eigen::MatrixXi E,EF,EI;
+      Eigen::MatrixXi dEF,dEI,allE;
+      igl::edge_flaps(Ft,E,allE,EMAP,EF,EI,dEF,dEI,EE);
+      int min_id = 0;
+      double min_area = std::numeric_limits<double>::max();
+      Eigen::VectorXd A;
+      igl::doublearea(uv,Ft,A);
+      for(int i=0;i<Ft.rows();i++){
+        if(min_area > A(i)){
+          min_area = A(i);
+          min_id = i;
+        }
+      }
+      Eigen::VectorXi X;
+      Eigen::MatrixXi Fl;
+      int id = expand_to_boundary(V,Ft,B,dEF,min_id,X);
+      igl::slice(Ft,X,1,Fl);
+      Eigen::VectorXi IX;
+      Eigen::MatrixXd NV,Nuv;
+      Eigen::MatrixXi NF;
+      igl::remove_unreferenced(V,Fl,NV,NF,IX);
+      igl::remove_unreferenced(uv,Fl,Nuv,NF,IX);
+      Eigen::MatrixXd CN;	
+      Eigen::MatrixXi FN;
+      igl::opengl::glfw::Viewer vv;
+      igl::opengl::glfw::imgui::ImGuiMenu menu;
+      
+      vv.data().set_mesh(Nuv,Fl);
+      vv.data().add_points(uv.row(Ft(min_id,0)),Eigen::RowVector3d(1,0,0));
+      vv.data().add_points(uv.row(Ft(min_id,1)),Eigen::RowVector3d(1,0,0));
+      vv.data().add_points(uv.row(Ft(min_id,2)),Eigen::RowVector3d(1,0,0));
+      vv.launch();
+      //igl::writeOBJ("patch_not_opt.obj",NV,NF,CN,FN,Nuv,NF);
+      
       local_smoothing(V,Ft,B,uv,100,1e10,avg);
       ii--;
     }
