@@ -3,6 +3,10 @@
 
 #include "shor.h"
 
+bool is_convex(
+  const Eigen::MatrixXd& P
+);
+
 void decompose_polygon(
   const Eigen::MatrixXd& P,
   const Eigen::VectorXi& R,

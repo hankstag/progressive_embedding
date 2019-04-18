@@ -64,6 +64,8 @@ void plots(
   std::vector<Object>& data 
 ){
   igl::opengl::glfw::Viewer vr;
+  igl::opengl::glfw::imgui::ImGuiMenu menu;
+  vr.plugins.push_back(&menu);
   int item_num = data.size();
   auto key_down = [&](
     igl::opengl::glfw::Viewer& viewer, unsigned char key, int modifier

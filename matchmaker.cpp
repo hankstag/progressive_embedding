@@ -4,6 +4,7 @@
 #include "cut_mesh/HalfEdgeIterator.h"
 #include "edge_split.h"
 #include "plot.h"
+#include "validity_check.h"
 
 #include <igl/vertex_triangle_adjacency.h>
 #include <igl/opengl/glfw/Viewer.h>
@@ -11,14 +12,12 @@
 #include <igl/matrix_to_list.h>
 // #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 // #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
-#include <igl/doublearea.h>
 
-#include <unordered_map>
-#include <igl/writeDMAT.h>
-#include <igl/writeOFF.h>
-#include <igl/writeOBJ.h>
-#include <algorithm> 
 #include <unordered_set>
+#include <unordered_map>
+#include <igl/writeOBJ.h>
+#include <igl/remove_unreferenced.h>
+#include "cut_mesh/edge_flaps.h"
 #include "progressive_embedding.h"
 
 void boundary_straightening(
@@ -414,6 +413,8 @@ void match_maker(
   const Eigen::VectorXi& T_s,
   const Eigen::MatrixXd& P_s
 ){
+  #define LOAD_M
+  #ifndef LOAD_M
   Eigen::VectorXi T = T_s;
   Eigen::MatrixXd P = P_s;
   boundary_straightening(P);
@@ -655,6 +656,55 @@ void match_maker(
     Eigen::MatrixXd nbc=V2;
     igl::harmonic(F ,nb,nbc,1,H1);
     H1.conservativeResize(H1.rows(),2);
+    #else 
+    Eigen::MatrixXd H1, nbc;
+    Eigen::VectorXi nb;
+    std::string serial_name = "local_save_pb";
+    igl::deserialize(V,"V",serial_name);
+    igl::deserialize(H1,"uv",serial_name);
+    igl::deserialize(F,"F",serial_name);
+    igl::deserialize(nb,"bi",serial_name);
+    igl::deserialize(nbc,"b",serial_name);
+    #endif
+    Eigen::VectorXi vl;
+    flipped_elements(H1,F,vl);
+    Eigen::VectorXi EMAP,EE;
+    Eigen::MatrixXi E,EF,EI;
+    Eigen::MatrixXi dEF,dEI,allE;
+    igl::edge_flaps(F,E,allE,EMAP,EF,EI,dEF,dEI,EE);
+    Eigen::VectorXi B;
+    B.setZero(V.rows());
+    for(int i=0;i<nb.rows();i++)
+      B(nb(i)) = 1;
+    std::set<int> lengths;
+    for(int i=0;i<vl.rows();i++){
+      Eigen::VectorXi lv;
+      Eigen::MatrixXi local_F,NF;
+      Eigen::MatrixXd local_V,NV,Nuv;
+      expand_to_boundary(V,F,B,dEF,i,lv);
+      igl::slice(F,lv,1,local_F);
+      Eigen::VectorXi II;
+      igl::remove_unreferenced(V,local_F,NV,NF,II);
+      igl::remove_unreferenced(H1,local_F,Nuv,NF,II);
+      
+      if(lengths.find(NF.rows())==lengths.end()){
+        Eigen::VectorXi FLIP;
+        flipped_elements(Nuv,NF,FLIP);
+        if(FLIP.sum()!=0){
+          std::cout<<"patch "<<i<<" has #flipped: "<<FLIP.sum()<<std::endl;
+          Eigen::MatrixXd CN;
+          Eigen::MatrixXi FN;
+          igl::writeOBJ("patch"+std::to_string(i)+".obj",NV,NF,CN,FN,Nuv,NF);
+          std::vector<Object> Os = {
+            Object(Nuv,NF,OTYPE::MESH),
+            Object(NV,NF,OTYPE::MESH)
+          };
+          //plots(Os);
+          lengths.insert(NF.rows());
+        }
+      }
+    }
+      
     // std::vector<int> S;
     // test_flip(H1,F,S);
     //bool succ = progressive_fix(ci,nb,nbc,V,F,H1);

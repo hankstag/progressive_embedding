@@ -62,10 +62,15 @@ set(MAPTOCONVEX_FILES
   map_to_convex.cpp
   plot.cpp
   loader.cpp
+  target_polygon.cpp
+  path_tracing.cpp
+  convexation.cpp
+  decompose_polygon.cpp
+  embed_points.cpp
 )
 
-
 add_executable(matchmaker_bin ${MATCHMAKER_FILES})
+
 add_executable(convex_bin ${MAPTOCONVEX_FILES})
 target_link_libraries(progressive_embedding igl::core igl::triangle igl::opengl_glfw igl::cgal igl::opengl_glfw_imgui tbb_static)
 target_link_libraries(shor_van_wyck igl::core igl::triangle igl::cgal igl::opengl_glfw igl::opengl_glfw_imgui)

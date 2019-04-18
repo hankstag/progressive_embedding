@@ -50,10 +50,11 @@ int main(int argc, char *argv[])
       exit(0);
   }
   //test_local_smoothing();
-  int loop, threshold;
+  int loop, threshold, size;
   std::string model,uvfile;
   cmdl("-in") >> model;
   cmdl("-uv") >> uvfile;
+  cmdl("-s", 0) >> size;
   // cmdl("-l",20) >> loop;
   // cmdl("-t",20) >> threshold;
   //#define QUAD

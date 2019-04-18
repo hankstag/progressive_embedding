@@ -7,7 +7,7 @@
 #include "coloring_mesh.h"
 #include <tbb/parallel_for.h>
 
-//#define DEBUG
+// #define DEBUG
 
 void local_smoothing(
   const Eigen::MatrixXd& V,
