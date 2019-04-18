@@ -62,6 +62,8 @@ set(MAPTOCONVEX_FILES
   map_to_convex.cpp
   plot.cpp
   loader.cpp
+  target_polygon.cpp
+  path_tracing.cpp
 )
 
 add_executable(matchmaker_bin ${MATCHMAKER_FILES})
