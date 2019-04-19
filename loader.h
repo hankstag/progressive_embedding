@@ -35,4 +35,13 @@ void load_in(const std::string model,
              Eigen::VectorXi& bd,
              Eigen::VectorXi& R);
 
+void load_in(const std::string model,
+             Eigen::MatrixXd& V,
+             Eigen::MatrixXi& F,
+             Eigen::VectorXi& R,
+             Eigen::VectorXi& bd,
+             Eigen::MatrixXd& polygon,
+             Eigen::MatrixXi& EE);
+
+//jiaran end
 #endif

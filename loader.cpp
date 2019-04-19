@@ -107,28 +107,50 @@ void load_in(const std::string model,
              Eigen::VectorXi& bd,
              Eigen::VectorXi& R)
 {
+    Eigen::MatrixXi EE;
+    load_in(model,V,F,R,bd,polygon,EE);
+}
+
+void load_in(const std::string model,
+             Eigen::MatrixXd& V,
+             Eigen::MatrixXi& F,
+             Eigen::VectorXi& R,
+             Eigen::VectorXi& bd,
+             Eigen::MatrixXd& polygon,
+             Eigen::MatrixXi& EE)
+{
     Eigen::MatrixXd uv,CN;
     Eigen::MatrixXi Fuv,FN;
     igl::readOBJ(model,V,uv,CN,F,Fuv,FN);
-    if(uv.rows()!=0){
+    
+    if(uv.rows()!=0)
+    {
         Eigen::MatrixXd nV(uv.rows(),3);
-        for(int i=0;i<F.rows();i++){
+        
+        for(int i=0;i<F.rows();i++)
+        {
             nV.row(Fuv(i,0)) << V.row(F(i,0));
             nV.row(Fuv(i,1)) << V.row(F(i,1));
             nV.row(Fuv(i,2)) << V.row(F(i,2));
         }
+        
         F = Fuv;
         V = nV;
     }
+    
     igl::boundary_loop(F,bd);
+    
     if(uv.rows()!=0)
         igl::slice(uv,bd,1,polygon);
     
     FILE * file = fopen(model.c_str(),"r");
+    
 #define LINE_MAX 2048
     char line[LINE_MAX];
+    
     Eigen::VectorXi RI;
     RI.setZero(V.rows());
+    EE.setZero();
     
     while (fgets(line, LINE_MAX, file) != NULL)
     {
@@ -146,6 +168,13 @@ void load_in(const std::string model,
                     int count = sscanf(l,"%d %d\n",&x[0],&x[1]);
                     RI(x[0]-1) = x[1];
                 }
+                else if(type[0] == 'e')
+                {
+                    int x[6];
+                    int count = sscanf(l,"%d %d %d %d %d %d\n",&x[0],&x[1],&x[2],&x[3],&x[4],&x[5]);
+                    EE.conservativeResize(EE.rows()+1,6);
+                    EE.bottomRows(1)<<x[0]-1,x[1]-1,x[2]-1,x[3]-1,x[4],x[5];
+                }
             }
         }
         
@@ -158,3 +187,4 @@ void load_in(const std::string model,
     for (int i=0; i<bd.rows(); i++)
         R(i) = RI(bd(i));
 }
+//jiaran end
