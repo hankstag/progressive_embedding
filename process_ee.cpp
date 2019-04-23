@@ -86,21 +86,23 @@ void buildAeq(
   int m = cut.rows();
   Aeq.resize(2*m,V.rows()*2);
   int A,B,C,D,A2,B2,C2,D2;
-  for(int i=0;i<cut.rows();i++){
-    int A2=cut(i,0);
+   for(int i=0;i<cut.rows();i++){
+     int A2=cut(i,0);
     int B2=cut(i,1);
     int C2=cut(i,2);
     int D2=cut(i,3);
-    
+      
+
     std::complex<double> l0,l1,r0,r1;
     l0 = std::complex<double>(uv(A2,0),uv(A2,1));
     l1 = std::complex<double>(uv(B2,0),uv(B2,1));
     r0 = std::complex<double>(uv(C2,0),uv(C2,1));
     r1 = std::complex<double>(uv(D2,0),uv(D2,1));
+  
 
     int r = std::round(2.0 * std::log((l0 - l1) / (r0 - r1)).imag() / igl::PI);
     r = ((r % 4) + 4) % 4; // ensure that r is between 0 and 3
-    switch(r){    
+     switch(r){
       case 0:
         Aeq.coeffRef(c,A2) += 1;
         Aeq.coeffRef(c,B2) += -1;
@@ -147,6 +149,7 @@ void buildAeq(
         break;
     }
   }
+    
   Aeq.conservativeResize(c,V.rows()*2);
   Aeq.makeCompressed();
   std::cout<<"Aeq size "<<Aeq.rows()<<","<<Aeq.cols()<<std::endl;

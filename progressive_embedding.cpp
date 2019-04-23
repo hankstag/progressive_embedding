@@ -479,7 +479,7 @@ bool insert_vertex_back(
       Eigen::MatrixXi NF;
       igl::remove_unreferenced(V,Fl,NV,NF,IX);
       igl::remove_unreferenced(uv,Fl,Nuv,NF,IX);
-      Eigen::MatrixXd CN;	
+      Eigen::MatrixXd CN;
       Eigen::MatrixXi FN;
       igl::opengl::glfw::Viewer vv;
       igl::opengl::glfw::imgui::ImGuiMenu menu;
@@ -490,7 +490,7 @@ bool insert_vertex_back(
       vv.data().add_points(uv.row(Ft(min_id,2)),Eigen::RowVector3d(1,0,0));
       vv.launch();
       //igl::writeOBJ("patch_not_opt.obj",NV,NF,CN,FN,Nuv,NF);
-      
+
       local_smoothing(V,Ft,B,uv,100,1e10,avg);
       ii--;
     }
@@ -586,7 +586,6 @@ bool progressive_embedding(
   // [ invert vertex in reverse order of L ]
   std::reverse(L.begin(),L.end());
   insert_vertex_back(L,B,V,F,uv,eps);
-  
   // igl::opengl::glfw::Viewer vr;
   // vr.data().set_mesh(uv,F);
   // vr.launch();
