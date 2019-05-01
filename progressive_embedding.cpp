@@ -439,7 +439,8 @@ bool insert_vertex_back(
     std::cerr<<"expect time: "<<minute<<" mins "<<second<<" seconds";
     std::cerr<<'\r';
 
-  } 
+  }
+  std::cout<<std::endl;
   return true;
 }
 

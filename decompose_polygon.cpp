@@ -106,7 +106,4 @@ void decompose_polygon(
   embed_points(C,V,F);
   igl::opengl::glfw::Viewer vr;
   merge_triangles(V,F,L);
-  igl::opengl::glfw::Viewer viewer;
-  viewer.data().set_mesh(V,F);
-  viewer.launch();
 }
