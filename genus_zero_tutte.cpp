@@ -15,17 +15,14 @@ int main(int argc, char *argv[])
   if(cmdl[{"-h","-help"}]){
       std::cout<<"Usage: ./ -options"<<std::endl;
       std::cout<<"-in: input model name"<<std::endl;
+      std::cout<<"-o: output model name"<<std::endl;
       exit(0);
   }
 
-  int loop, threshold;
   std::string model,outfile;
-  bool verbose;
   cmdl("-in") >> model;
-  cmdl("-t", 20) >> threshold;
-  cmdl("-vb",false) >> verbose;
   cmdl("-o", model+"_out.obj") >> outfile;
-  double eps = std::pow(10,threshold);
+  
   Eigen::MatrixXd V,polygon,uv;
   Eigen::MatrixXi F;
   Eigen::VectorXi T,R,bd;
@@ -37,18 +34,11 @@ int main(int argc, char *argv[])
   igl::map_vertices_to_circle(V,bd,circle);
   Eigen::MatrixXd H;
   igl::harmonic(F,bd,circle,1,H);
-  igl::Timer tm;
-  tm.start();
-  double t0 = tm.getElapsedTime();
-  progressive_embedding(V,F,H,bd,circle,eps,true);
-  double t1 = tm.getElapsedTime();
   uv = H;
   
   Eigen::VectorXi I;
   flipped_elements(uv,F,I);
   std::cout<<"# flips: "<<I.sum()<<std::endl;
-  std::cout<<"Running time: ";
-  printf("%.3f (s)\n",t1-t0);
   
   igl::opengl::glfw::Viewer vr;
   plot_mesh(vr,uv,F,{},Eigen::VectorXi());

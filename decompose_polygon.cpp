@@ -15,7 +15,7 @@ bool is_convex(
     double b[2] = {P(i,0),P(i,1)};
     double c[2] = {P(next,0),P(next,1)};
     short r = igl::copyleft::cgal::orient2D(a,b,c);
-    if(r <= 0)
+    if(r < 0)
         return false;
   }
   return true;
@@ -106,4 +106,7 @@ void decompose_polygon(
   embed_points(C,V,F);
   igl::opengl::glfw::Viewer vr;
   merge_triangles(V,F,L);
+  igl::opengl::glfw::Viewer viewer;
+  viewer.data().set_mesh(V,F);
+  viewer.launch();
 }

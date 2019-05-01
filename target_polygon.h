@@ -61,7 +61,8 @@ void target_polygon(
     const Eigen::MatrixXi& F,
     const Eigen::MatrixXd& p, 
     const Eigen::VectorXi& pi,
-    std::vector<Eigen::MatrixXd>& poly
+    std::vector<Eigen::MatrixXd>& poly,
+    bool hilbert=false
 );
 
 #endif

@@ -298,7 +298,6 @@ void collapse_invalid_elements(
   };
 
   int num_invalid = I.sum();
-  const int MAX_LAYER = 5;
   int layer = 0;
   while(num_invalid!=0){
     bool do_collapse = false;
@@ -359,7 +358,7 @@ bool insert_vertex_back(
     double avg = domain_area / n_face;
     
     double time1 = timer.getElapsedTime();
-    std::cout<<"insert back "<<ii<<"/"<<L.size()<<" ";
+    std::cerr<<"insert back "<<ii<<"/"<<L.size()<<" ";
     //std::cout<<std::get<0>(L[ii])<<"(n) <-> "<<std::get<1>(L[ii])<<"(o)"<<std::endl;
     
     Action ac = L[ii];
@@ -401,6 +400,7 @@ bool insert_vertex_back(
         if(succ && max_energy > e_m){
           max_energy = e_m;
           pos = q;
+          break;
         }
     }
 
@@ -517,7 +517,7 @@ bool progressive_embedding(
     if(!std::isfinite(E(i))||E(i)>eps)
       I(i)=1;
   }
-  
+  std::cerr<<"#total invalid: "<<I.sum()<<std::endl;
   std::vector<Action> L; // list of collapse operation stored
   collapse_invalid_elements(V,F,uv,I,B,eps,avg,L);
 

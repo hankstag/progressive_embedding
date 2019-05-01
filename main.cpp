@@ -43,35 +43,40 @@ int main(int argc, char *argv[])
   if(cmdl[{"-h","-help"}]){
       std::cout<<"Usage: ./matchmaker_bin -options"<<std::endl;
       std::cout<<"-in: input model name"<<std::endl;
-      std::cout<<"-l: # local iteration in progressive fix"<<std::endl;
-      std::cout<<"-t: exponent of energy threshold for edge collapsing"<<std::endl;
-      std::cout<<"-p: whether use progressive embedding"<<std::endl;
-      std::cout<<"-b: whether use the boundary info in obj file"<<std::endl;
+      std::cout<<"-o: output model name"<<std::endl;
+      std::cout<<"-b: whether use boundary from uv"<<std::endl;
+      std::cout<<"-s: using space filling curve"<<std::endl;
       exit(0);
   }
-  //test_local_smoothing();
-  int loop, threshold, size;
-  std::string model,uvfile;
+  int threshold;
+  std::string model,outfile;
+  bool use_bd, space_filling_curve;
   cmdl("-in") >> model;
-  cmdl("-uv") >> uvfile;
-  cmdl("-s", 0) >> size;
-  cmdl("-t",20) >> threshold;
+  cmdl("-b",false) >> use_bd;
+  cmdl("-s",false) >> space_filling_curve;
+  cmdl("-o", model+"_out.obj") >> outfile;
   
   Eigen::MatrixXd V,polygon,uv;
   Eigen::MatrixXi F;
   Eigen::VectorXi T,R;
   load_model(model,V,uv,F,polygon,R,T);
-  
-  Eigen::MatrixXd c(3,2);
-  c<<0,0,1,0,0,1;
+  Eigen::MatrixXd c;
   Eigen::VectorXi ci;
-  random_internal_vertices(V,F,ci);
   
-  std::vector<Eigen::MatrixXd> polys;
-  target_polygon(V,F,c,ci,polys);
+  if(!use_bd){
+    c.resize(3,2);
+    if(!space_filling_curve)
+      c<<0,0,1,0,0,1;
+    else 
+      c<<0,0,0,5.5,5.5,0;
+    random_internal_vertices(V,F,ci);
+    std::vector<Eigen::MatrixXd> polys;
+    target_polygon(V,F,c,ci,polys,space_filling_curve);
+    R.setZero(polys[0].rows());
+    polygon = polys[0];
+  }
   
-  R.setZero(polys[0].rows());
-  match_maker(V,F,uv,c,ci,R,T,polys[0]);
+  match_maker(V,F,uv,c,ci,R,T,polygon);
   
   igl::SLIMData sData;
   sData.slim_energy = igl::SLIMData::SYMMETRIC_DIRICHLET;
@@ -80,6 +85,7 @@ int main(int argc, char *argv[])
   Eigen::VectorXd E;
   slim_precompute(V,F,uv,sData,igl::SLIMData::SYMMETRIC_DIRICHLET,ci,c,0,true,E,1.0);
   igl::opengl::glfw::Viewer vr;
+  vr.data().set_mesh(V,F);
   auto key_down = [&](
     igl::opengl::glfw::Viewer& viewer, unsigned char key, int modifier
   ){
@@ -87,6 +93,7 @@ int main(int argc, char *argv[])
       slim_solve(sData,20,E);
       viewer.data().clear();
       viewer.data().set_mesh(V,F);
+      viewer.core().align_camera_center(V);
       viewer.data().set_uv(sData.V_o,F);
       viewer.data().show_texture = true;
     }
@@ -94,7 +101,7 @@ int main(int argc, char *argv[])
       slim_solve(sData,20,E);
       viewer.data().clear();
       viewer.data().set_mesh(sData.V_o,F);
-      std::cout<<sData.V_o.row(ci(1))<<std::endl;
+      viewer.core().align_camera_center(sData.V_o);
       viewer.data().show_texture = false;
     }
     return false;
@@ -102,4 +109,8 @@ int main(int argc, char *argv[])
   vr.callback_key_down = key_down;
   //plot_mesh(vr,uv,F,{},Eigen::VectorXi());
   vr.launch();
+  
+  Eigen::MatrixXd CN;
+  Eigen::MatrixXi FN;
+  igl::writeOBJ(outfile,V,F,CN,FN,uv,F);
 }

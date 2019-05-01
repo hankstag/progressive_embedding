@@ -507,19 +507,18 @@ void target_polygon(
     const Eigen::MatrixXi& F,
     const Eigen::MatrixXd& p, 
     const Eigen::VectorXi& pi,
-    std::vector<Eigen::MatrixXd>& poly
+    std::vector<Eigen::MatrixXd>& poly,
+    bool hilbert
 ){
     cout<<"target polygon"<<endl;
     // generate background mesh [1. rec; 2.hilbert curve]
     Eigen::MatrixXd VV;
     Eigen::MatrixXi FF;
     map<int,int> m; // map from 3d to 2d
-    //#define HILBERT
-    #ifndef HILBERT
-    background_mesh(REC_EDGE_NUM/4,p,pi,m,VV,FF);
-    #else
-    generate_hilbert(3,p,pi,m,VV,FF);
-    #endif
+    if(!hilbert)
+      background_mesh(REC_EDGE_NUM/4,p,pi,m,VV,FF);
+    else
+      generate_hilbert(3,p,pi,m,VV,FF);
     //Eigen::VectorXi b(pi.rows());
     //std::vector<std::vector<int>> bdt,bds;
     Eigen::VectorXi bdt,bds;
@@ -542,90 +541,90 @@ void target_polygon(
     igl::slice(VV,bdt,1,L2);
     Eigen::VectorXd rt,rs;
     //#define PRESERVE_CORNER
-    #ifndef HILBERT
-    L1.conservativeResize(L1.rows()+1,3);
-    L1.bottomRows(1)<<V.row(bds(0));
-    L2.conservativeResize(L2.rows()+1,Eigen::NoChange);
-    L2.bottomRows(1)<<VV.row(bdt(0));
-    Eigen::MatrixXd PTS;
-    line_ratio(L1,rt);
-    sample_polyline(L2,rt,PTS);
-    PTS.conservativeResize(PTS.rows()-1,Eigen::NoChange);
-    poly.push_back(PTS);
-    #else
-    // evenly sample between every point of initial space filling curve
-    #ifdef EVEN
-    int nv_to_insert = L1.rows()-L2.rows();
-    Eigen::VectorXi nv_each_edge(L2.rows());
-    nv_each_edge.setConstant(nv_to_insert/L2.rows());
-    int nv_left = nv_to_insert % L2.rows();
-    for(int i=0;i<nv_left;i++)
-        nv_each_edge(i) += 1;
-    if(nv_each_edge.sum()!=L1.rows()-L2.rows()){
-        std::cout<<"sample wrong"<<std::endl;
-        exit(0);
+    if(!hilbert){
+      L1.conservativeResize(L1.rows()+1,3);
+      L1.bottomRows(1)<<V.row(bds(0));
+      L2.conservativeResize(L2.rows()+1,Eigen::NoChange);
+      L2.bottomRows(1)<<VV.row(bdt(0));
+      Eigen::MatrixXd PTS;
+      line_ratio(L1,rt);
+      sample_polyline(L2,rt,PTS);
+      PTS.conservativeResize(PTS.rows()-1,Eigen::NoChange);
+      poly.push_back(PTS);
+    }else{
+      // evenly sample between every point of initial space filling curve
+      #ifdef EVEN
+      int nv_to_insert = L1.rows()-L2.rows();
+      Eigen::VectorXi nv_each_edge(L2.rows());
+      nv_each_edge.setConstant(nv_to_insert/L2.rows());
+      int nv_left = nv_to_insert % L2.rows();
+      for(int i=0;i<nv_left;i++)
+          nv_each_edge(i) += 1;
+      if(nv_each_edge.sum()!=L1.rows()-L2.rows()){
+          std::cout<<"sample wrong"<<std::endl;
+          exit(0);
+      }
+      int s = 0;
+      Eigen::MatrixXd sampled(L1.rows()+1,2);
+      for(int k=0;k<L2.rows();k++){
+          // subdivide edge (k,k+1)
+          Eigen::VectorXd rs(nv_each_edge(k)+2);
+          for(int j=0;j<rs.rows();j++){
+              rs(j) = 1.0*j/(rs.rows()-1);
+          }
+          Eigen::MatrixXd local_L2;
+          Eigen::MatrixXd L2_t(2,2);
+          L2_t<<L2.row(k),L2.row((k+1)%L2.rows());
+          sample_polyline(L2_t,rs,local_L2);
+          sampled.block(s,0,local_L2.rows(),2) = local_L2;
+          s += (nv_each_edge(k)+1);
+      }
+      #else
+      std::cout<<"sample goal:"<<L1.rows()<<std::endl;
+      L1.conservativeResize(L1.rows()+1,3);
+      L1.bottomRows(1)<<V.row(bds(0));
+      L2.conservativeResize(L2.rows()+1,Eigen::NoChange);
+      L2.bottomRows(1)<<VV.row(bdt(0));
+      line_ratio(L1,rs);
+      line_ratio(L2,rt);
+      Eigen::MatrixXd sampled(L1.rows(),2);
+      int last_s = 0;
+      for(int k=0;k<L2.rows()-1;k++){
+          double rk = rt(k);
+          double rk1 = rt(k+1);
+          int s1=last_s;
+          int s2=-1;
+          for(int j=0;j<L1.rows()-1;j++){
+              // if(rk >= rs(j) && rk < rs(j+1))
+              //     s1 = j;
+              if(rk1 >= rs(j) && rk1 < rs(j+1))
+                  s2 = j;
+          }
+          if(s1 >= s2 || s2 == -1)
+              s2 = (s1+1)%L1.rows();
+          if(k == L2.rows()-2)
+              s2 = L1.rows()-1;
+          last_s = s2;
+          //std::cout<<s1<<","<<s2<<std::endl;
+          // sample between s1, s2
+          Eigen::VectorXd local_rs;
+          Eigen::MatrixXd local_L2;
+          int l = std::max(s2-s1+1,2);
+          line_ratio(L1.block(s1,0,l,3),local_rs);
+          sample_polyline(L2.block(k,0,2,2),local_rs,local_L2);
+          sampled.block(s1,0,local_L2.rows(),2) = local_L2;
+      }
+      #endif
+      sampled.conservativeResize(sampled.rows()-1,Eigen::NoChange);
+      Eigen::MatrixXi F_;
+      std::vector<std::pair<int,int>> edges;
+      std::vector<int> points;
+      for(int i=0;i<sampled.rows();i++){
+          points.push_back(i);
+          edges.push_back(std::make_pair(i,(i+1)%sampled.rows()));
+      }
+      //display(sampled,F_,edges,points,{},{});
+      poly.push_back(sampled);
     }
-    int s = 0;
-    Eigen::MatrixXd sampled(L1.rows()+1,2);
-    for(int k=0;k<L2.rows();k++){
-        // subdivide edge (k,k+1)
-        Eigen::VectorXd rs(nv_each_edge(k)+2);
-        for(int j=0;j<rs.rows();j++){
-            rs(j) = 1.0*j/(rs.rows()-1);
-        }
-        Eigen::MatrixXd local_L2;
-        Eigen::MatrixXd L2_t(2,2);
-        L2_t<<L2.row(k),L2.row((k+1)%L2.rows());
-        sample_polyline(L2_t,rs,local_L2);
-        sampled.block(s,0,local_L2.rows(),2) = local_L2;
-        s += (nv_each_edge(k)+1);
-    }
-    #else
-    std::cout<<"sample goal:"<<L1.rows()<<std::endl;
-    L1.conservativeResize(L1.rows()+1,3);
-    L1.bottomRows(1)<<V.row(bds(0));
-    L2.conservativeResize(L2.rows()+1,Eigen::NoChange);
-    L2.bottomRows(1)<<VV.row(bdt(0));
-    line_ratio(L1,rs);
-    line_ratio(L2,rt);
-    Eigen::MatrixXd sampled(L1.rows(),2);
-    int last_s = 0;
-    for(int k=0;k<L2.rows()-1;k++){
-        double rk = rt(k);
-        double rk1 = rt(k+1);
-        int s1=last_s;
-        int s2=-1;
-        for(int j=0;j<L1.rows()-1;j++){
-            // if(rk >= rs(j) && rk < rs(j+1))
-            //     s1 = j;
-            if(rk1 >= rs(j) && rk1 < rs(j+1))
-                s2 = j;
-        }
-        if(s1 >= s2 || s2 == -1)
-            s2 = (s1+1)%L1.rows();
-        if(k == L2.rows()-2)
-            s2 = L1.rows()-1;
-        last_s = s2;
-        //std::cout<<s1<<","<<s2<<std::endl;
-        // sample between s1, s2
-        Eigen::VectorXd local_rs;
-        Eigen::MatrixXd local_L2;
-        int l = std::max(s2-s1+1,2);
-        line_ratio(L1.block(s1,0,l,3),local_rs);
-        sample_polyline(L2.block(k,0,2,2),local_rs,local_L2);
-        sampled.block(s1,0,local_L2.rows(),2) = local_L2;
-    }
-    #endif
-    sampled.conservativeResize(sampled.rows()-1,Eigen::NoChange);
-    Eigen::MatrixXi F_;
-    std::vector<std::pair<int,int>> edges;
-    std::vector<int> points;
-    for(int i=0;i<sampled.rows();i++){
-        points.push_back(i);
-        edges.push_back(std::make_pair(i,(i+1)%sampled.rows()));
-    }
-    //display(sampled,F_,edges,points,{},{});
-    poly.push_back(sampled);
-    #endif
     std::cout<<"sample end"<<std::endl;
 }
