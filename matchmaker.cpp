@@ -20,6 +20,9 @@
 #include "cut_mesh/edge_flaps.h"
 #include "progressive_embedding.h"
 
+#include <igl/facet_components.h>
+#include <igl/copyleft/cgal/point_inside_polygon.h>
+
 void boundary_straightening(
   Eigen::MatrixXd& P
 ){
@@ -402,7 +405,19 @@ void prapare_TT(
         }
     }
 }
+void test_decompose(){
+  Eigen::MatrixXd P(9,2);
+  P << 0,0,2,0,4,0,4,2,1,2,1,1,2,1,2,4,0,4;
+  Eigen::VectorXi R(8);
+  R.setZero();
+  R(4) = 1;
+  Eigen::MatrixXd c;
+  Eigen::MatrixXd V2;
+  Eigen::MatrixXi F2;
+  std::vector<std::vector<int>> L;
 
+  decompose_polygon(P,R,c,V2,F2,L);
+}
 void match_maker(
   Eigen::MatrixXd& V,
   Eigen::MatrixXi& F,
@@ -413,8 +428,7 @@ void match_maker(
   const Eigen::VectorXi& T_s,
   const Eigen::MatrixXd& P_s
 ){
-  #define LOAD_M
-  #ifndef LOAD_M
+  //test_decompose();
   Eigen::VectorXi T = T_s;
   Eigen::MatrixXd P = P_s;
   boundary_straightening(P);
@@ -599,16 +613,8 @@ void match_maker(
         Eigen::MatrixXi F0;
         igl::list_to_matrix(F_vec,F);
         igl::list_to_matrix(V_vec,V);
-        // std::cout<<"norm 1: "<<(F0-F).norm()<<std::endl;
-        // std::cout<<"norm 2: "<<(V0-V).norm()<<std::endl;
         std::cout<<"iteration "<<xc++<<"/"<<to_trace_ordered.size()<<std::endl;
         std::cout<<"current #F "<<F.rows()<<std::endl;
-        // if(xc==20) {
-        //   std::ofstream myfile;
-        //   myfile.open("model_size.txt",std::ios_base::app);
-        //   myfile<<F.rows()<<std::endl;
-        //   exit(0);
-        // }
     }
     Eigen::MatrixXd CN,TC;
     Eigen::MatrixXi FN,FTC;
@@ -656,58 +662,99 @@ void match_maker(
     Eigen::MatrixXd nbc=V2;
     igl::harmonic(F ,nb,nbc,1,H1);
     H1.conservativeResize(H1.rows(),2);
-    #else 
-    Eigen::MatrixXd H1, nbc;
-    Eigen::VectorXi nb;
-    std::string serial_name = "local_save_pb";
-    igl::deserialize(V,"V",serial_name);
-    igl::deserialize(H1,"uv",serial_name);
-    igl::deserialize(F,"F",serial_name);
-    igl::deserialize(nb,"bi",serial_name);
-    igl::deserialize(nbc,"b",serial_name);
-    #endif
-    Eigen::VectorXi vl;
-    flipped_elements(H1,F,vl);
-    Eigen::VectorXi EMAP,EE;
-    Eigen::MatrixXi E,EF,EI;
-    Eigen::MatrixXi dEF,dEI,allE;
-    igl::edge_flaps(F,E,allE,EMAP,EF,EI,dEF,dEI,EE);
-    Eigen::VectorXi B;
-    B.setZero(V.rows());
-    for(int i=0;i<nb.rows();i++)
-      B(nb(i)) = 1;
-    std::set<int> lengths;
-    for(int i=0;i<vl.rows();i++){
-      Eigen::VectorXi lv;
-      Eigen::MatrixXi local_F,NF;
-      Eigen::MatrixXd local_V,NV,Nuv;
-      expand_to_boundary(V,F,B,dEF,i,lv);
-      igl::slice(F,lv,1,local_F);
+    uv = H1;
+    igl::opengl::glfw::Viewer vr;
+    plot_mesh(vr,H1,F,{},Eigen::VectorXi());
+    vr.launch();
+    // decompose mesh into patches
+    Eigen::VectorXi group;
+    Eigen::VectorXi counts;
+    std::vector<std::vector<std::vector<int>>> TTv;
+    for(int i=0;i<TT.rows();i++){
+      std::vector<int> x,y,z;
+      if(TT(i,0)>=0) x.push_back(TT(i,0));
+      if(TT(i,1)>=0) x.push_back(TT(i,1));
+      if(TT(i,2)>=0) x.push_back(TT(i,2));
+      TTv.push_back({x,y,z});
+    }
+    igl::facet_components(TTv,group,counts);
+    std::cout<<counts<<std::endl;
+    
+    int patch_num = group.maxCoeff()+1;
+    std::vector<int> fn(patch_num,0);
+    for(int i=0;i<group.rows();i++){
+      fn[group(i)]++;
+    }
+    // build the patches
+    std::vector<Eigen::MatrixXd> PV; // PV[i] is vertex positions of ith patch
+    std::vector<Eigen::MatrixXd> Puv; // PV[i] is vertex positions of ith patch
+    std::vector<Eigen::MatrixXi> PF; // PF[i] is faces of ith patch
+    std::vector<Eigen::VectorXi> PM; // PM[i] is the correspondence for each patch to original mesh
+    std::vector<int> ptr(patch_num,0); // ptr[i] points to the last valid line in PF[i]
+    for(int k=0;k<patch_num;k++){ // initialize size of PF
+      Eigen::MatrixXi kF(fn[k],3);
+      Eigen::MatrixXd kuv, kV;
+      PV.push_back(kV);
+      Puv.push_back(kuv);
+      std::cout<<"size of patch "<<k<<" is "<<fn[k]<<std::endl;
+      PF.push_back(kF);
+    }
+    for(int f=0;f<F.rows();f++){
+      int g = group(f);
+      PF[g].row(ptr[g]++) << F.row(f);
+    }
+    for(int k=0;k<patch_num;k++){
+      Eigen::MatrixXi kF;
       Eigen::VectorXi II;
-      igl::remove_unreferenced(V,local_F,NV,NF,II);
-      igl::remove_unreferenced(H1,local_F,Nuv,NF,II);
-      
-      if(lengths.find(NF.rows())==lengths.end()){
-        Eigen::VectorXi FLIP;
-        flipped_elements(Nuv,NF,FLIP);
-        if(FLIP.sum()!=0){
-          std::cout<<"patch "<<i<<" has #flipped: "<<FLIP.sum()<<std::endl;
-          Eigen::MatrixXd CN;
-          Eigen::MatrixXi FN;
-          igl::writeOBJ("patch"+std::to_string(i)+".obj",NV,NF,CN,FN,Nuv,NF);
-          std::vector<Object> Os = {
-            Object(Nuv,NF,OTYPE::MESH),
-            Object(NV,NF,OTYPE::MESH)
-          };
-          //plots(Os);
-          lengths.insert(NF.rows());
+      igl::remove_unreferenced(V, PF[k],PV[k] ,kF,II); // PF[k] to V
+      igl::remove_unreferenced(H1,PF[k],Puv[k],kF,II);
+      Eigen::VectorXi fix;
+      Eigen::MatrixXd fix_pos;
+      igl::boundary_loop(kF,fix);
+      igl::slice(Puv[k],fix,1,fix_pos);
+      //igl::slice(nb,II,1,fix);
+      //igl::slice(nbc,II,1,fix_pos);
+      Eigen::VectorXi fl;
+      flipped_elements(Puv[k],kF,fl);
+      if(fl.sum() > 0){ // Tutte generates flips
+        std::cout<<"flips "<<fl.sum()<<std::endl;
+        Eigen::RowVector2d bc;
+        bc.setZero();
+        for(int r=0;r<fix_pos.rows();r++)
+          bc += fix_pos.row(r);
+        bc /= fix_pos.rows();
+        
+        Eigen::VectorXi BI(Puv[k].rows());
+        BI.setZero();
+        for(int i=0;i<fix.rows();i++)
+          BI(fix(i)) = 1;
+        for(int id = 0;id<Puv[k].rows();id++){
+          Eigen::RowVector2d pt = Puv[k].row(id);
+          if(!BI(id) && !igl::copyleft::cgal::point_inside_polygon(fix_pos,pt))
+            Puv[k].row(id) << bc;
+        }
+        std::vector<Object> Os = {Object(PV[k],kF,OTYPE::MESH),
+                                  Object(Puv[k],kF,OTYPE::MESH)};
+        plots(Os);
+        // Eigen::MatrixXd CN;
+        // Eigen::MatrixXi FN;
+        //igl::writeOBJ("filigree_patch.obj",PV[k],kF,CN,FN,Puv[k],kF);
+        progressive_embedding(PV[k],kF,Puv[k],fix,fix_pos,1e15);
+        // copy new positions back
+        for(int i=0;i<uv.rows();i++){
+          if(II(i) != -1)
+            uv.row(i) << Puv[k].row(II(i));
         }
       }
-    }
+
       
-    // std::vector<int> S;
-    // test_flip(H1,F,S);
-    //bool succ = progressive_fix(ci,nb,nbc,V,F,H1);
-    bool succ = progressive_embedding(V,F,H1,nb,nbc,1e100);
-    uv = H1;
+    }
+    Eigen::VectorXi I;
+    flipped_elements(uv,F,I);
+    std::cout<<"check flips: "<<I.sum()<<std::endl;
+    igl::opengl::glfw::Viewer viewer;
+    viewer.data().clear();
+    viewer.data().set_mesh(uv,F);
+    //viewer.data().add_points(bc,Eigen::RowVector3d(1,0,0));
+    viewer.launch();
 }

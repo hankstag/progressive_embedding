@@ -58,24 +58,27 @@ set(MATCHMAKER_FILES
     loader.cpp
 )
 
-set(MAPTOCONVEX_FILES
-  map_to_convex.cpp
+set(GENUSZERO_FILES
+  genus_zero_mapping.cpp
   plot.cpp
   loader.cpp
-  target_polygon.cpp
-  path_tracing.cpp
-  convexation.cpp
-  decompose_polygon.cpp
-  embed_points.cpp
+)
+
+set(UNTANGLE_FILES
+  untangling.cpp
+  plot.cpp
+  loader.cpp
 )
 
 add_executable(matchmaker_bin ${MATCHMAKER_FILES})
+add_executable(genus_zero_mapping_bin ${GENUSZERO_FILES})
+add_executable(untangle_bin ${UNTANGLE_FILES})
 
-add_executable(convex_bin ${MAPTOCONVEX_FILES})
 target_link_libraries(progressive_embedding igl::core igl::triangle igl::opengl_glfw igl::cgal igl::opengl_glfw_imgui tbb_static)
 target_link_libraries(shor_van_wyck igl::core igl::triangle igl::cgal igl::opengl_glfw igl::opengl_glfw_imgui)
 target_include_directories(progressive_embedding SYSTEM PUBLIC ${THIRD_PARTY_DIR}/tbb/include)
 
 target_link_libraries(matchmaker_bin progressive_embedding shor_van_wyck)
-target_link_libraries(convex_bin progressive_embedding shor_van_wyck)
+target_link_libraries(genus_zero_mapping_bin progressive_embedding shor_van_wyck)
+target_link_libraries(untangle_bin progressive_embedding shor_van_wyck)
 

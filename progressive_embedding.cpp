@@ -17,6 +17,7 @@
 
 double domain_area = 0.0;
 int n_face = 0;
+bool vb = false;
 
 bool is_face_valid(
   const Eigen::Matrix<double,2,3>& G_t,
@@ -255,6 +256,7 @@ void collapse_invalid_elements(
   const double avg,
   std::vector<Action>& L
 ){
+  std::cout<<"collapsing ... "<<std::endl;
   n_face = F.rows();
   // Build adjacency info
   Eigen::VectorXi EMAP,EE;
@@ -317,27 +319,11 @@ void collapse_invalid_elements(
       }
     }
     num_invalid = I.sum();
-    std::cout<<"invalid size "<<num_invalid<<std::endl;
+    //std::cout<<"invalid size "<<num_invalid<<std::endl;
 
     layer = do_collapse ? 0 : layer+1;
-    if(layer == MAX_LAYER){
-      std::cout<<"move to barycenter"<<std::endl;
-      int n = 0;
-      for(int i=0;i<I.rows();i++){
-        if(I(i) == 0) continue;
-        Eigen::VectorXi X;
-        Eigen::MatrixXi Fl;
-        int id = expand_to_boundary(V,F,B,dEF,i,X);
-        igl::slice(F,X,1,Fl);
-        if(id == -1) continue;
-        move_to_center(uv,Fl,id);
-        for(int j=0;j<X.rows();j++)
-          I(X(j))=0;
-        break;
-      }
-    }
-
     if(do_collapse) continue;
+    
     // if did not collapse anything
     // also collapse its layer 1...k neighbors
     std::set<int> W;
@@ -353,6 +339,7 @@ void collapse_invalid_elements(
         I(s) = 1;
     }
   }
+  std::cout<<"collapsing done"<<std::endl;
 }
 bool insert_vertex_back(
   const std::vector<Action>& L,
@@ -367,24 +354,13 @@ bool insert_vertex_back(
   timer.start();
   double total_time = 0.0;
 
-  int ii = 0;
-  //#define SHORTCUT
-  #ifdef SHORTCUT
-  // deserialize
-  std::string serial_name = "carter100";
-  igl::deserialize(ii,"ii",serial_name);
-  igl::deserialize(uv,"uv",serial_name);
-  igl::deserialize(F,"F",serial_name);
-  #endif
-
-  std::cout<<ii<<std::endl;
-  for(;ii<L.size();ii++){
+  for(int ii=0;ii<L.size();ii++){
     
     double avg = domain_area / n_face;
     
     double time1 = timer.getElapsedTime();
-    std::cout<<"rollback "<<ii<<"/"<<L.size()<<std::endl;
-    std::cout<<std::get<0>(L[ii])<<"(n) <-> "<<std::get<1>(L[ii])<<"(o)"<<std::endl;
+    std::cout<<"insert back "<<ii<<"/"<<L.size()<<" ";
+    //std::cout<<std::get<0>(L[ii])<<"(n) <-> "<<std::get<1>(L[ii])<<"(o)"<<std::endl;
     
     Action ac = L[ii];
     Eigen::MatrixXi ring = std::get<2>(ac);
@@ -413,7 +389,7 @@ bool insert_vertex_back(
     
     Eigen::MatrixXd cd;
     find_candidate_positions(uv,ring,v1,v0,cd);
-    std::cout<<"try pos: "<<cd.rows()<<std::endl;
+    //std::cout<<"try pos: "<<cd.rows()<<std::endl;
     for(int j=0;j<cd.rows();j++){
         Eigen::RowVector2d q;
         Eigen::RowVector2d x;
@@ -440,7 +416,8 @@ bool insert_vertex_back(
 
     if(found){
       n_face += 2;
-      std::cout<<"current face size "<<n_face<<"/"<<F.rows()<<std::endl;
+      if(vb)
+        std::cout<<"current face size "<<n_face<<"/"<<F.rows()<<std::endl;
       uv.row(v1) << pos;
       Eigen::MatrixXi Ft;
       drop_empty_faces(F,Ft);
@@ -456,8 +433,11 @@ bool insert_vertex_back(
 
     double time2 = timer.getElapsedTime();
     total_time += (time2 - time1);
-    double expect_total_time = (total_time / (ii+1)) * L.size();
-    std::cout<<"expect time: "<<(expect_total_time-total_time)/60.0<<" mins "<<std::endl;
+    double expect_total_time = (total_time / (std::max(1,ii+1))) * L.size();
+    int minute = int((expect_total_time-total_time)/60.0);
+    int second = (expect_total_time-total_time) - 60*minute;
+    std::cerr<<"expect time: "<<minute<<" mins "<<second<<" seconds";
+    std::cerr<<'\r';
 
   } 
   return true;
@@ -499,7 +479,8 @@ bool progressive_embedding(
   Eigen::MatrixXd& uv,
   const Eigen::VectorXi& bi,
   const Eigen::MatrixXd& b,
-  double eps
+  double eps,
+  bool verbose
 ){
 
   // [ Reference shape area for Dirichlet Energy ]

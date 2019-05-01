@@ -55,10 +55,8 @@ int main(int argc, char *argv[])
   cmdl("-in") >> model;
   cmdl("-uv") >> uvfile;
   cmdl("-s", 0) >> size;
-  // cmdl("-l",20) >> loop;
-  // cmdl("-t",20) >> threshold;
-  //#define QUAD
-  #ifndef QUAD
+  cmdl("-t",20) >> threshold;
+  
   Eigen::MatrixXd V,polygon,uv;
   Eigen::MatrixXi F;
   Eigen::VectorXi T,R;
@@ -74,51 +72,6 @@ int main(int argc, char *argv[])
   
   R.setZero(polys[0].rows());
   match_maker(V,F,uv,c,ci,R,T,polys[0]);
-  #else
-  // load model and uv
-  Eigen::MatrixXd V,uv,polygon;
-  Eigen::MatrixXi F,Fuv;
-  Eigen::VectorXi bd0,bd1;
-  load_model_with_seam(model,V,F,polygon,bd0);
-  
-  std::pair<int,int> match;
-  load_matching_info(uvfile,match);
-  Eigen::MatrixXd _polygon;
-  Eigen::VectorXi R;
-  load_model_with_seam(uvfile,uv,Fuv,_polygon,bd1);
-  uv.conservativeResize(uv.rows(),2);
-  int id0 = -1,id1 = -1;
-  for(int i=0;i<bd0.rows();i++){
-      if(bd0(i) == match.first)
-          id0 = i;
-      if(bd1(i) == match.second)
-          id1 = i;
-  }
-  int offset = (id1-id0+bd1.rows())%bd1.rows();
-  std::cout<<"setting rotation index..."<<std::endl;
-  set_rotation_index(uv,Fuv,R,offset);
-  assert(bd0.rows()==bd1.rows());
-
-  igl::opengl::glfw::Viewer viewer1;
-  //plot_mesh(viewer1,V,F,{},true);
-
-  Eigen::VectorXi ci;
-  Eigen::MatrixXd c;
-  
-  //#define SHORTCUT
-  #ifdef SHORTCUT
-  std::string serial_name = "local_save_pb";
-  igl::deserialize(V,"V",serial_name);
-  igl::deserialize(uv,"uv",serial_name);
-  igl::deserialize(F,"F",serial_name);
-  igl::deserialize(ci,"bi",serial_name);
-  igl::deserialize(c,"b",serial_name);
-  
-  progressive_embedding(V,F,uv,ci,c,1e20);
-  #endif
-
-  match_maker(V,F,uv,c,ci,R,bd0,polygon);
-  #endif
   
   igl::SLIMData sData;
   sData.slim_energy = igl::SLIMData::SYMMETRIC_DIRICHLET;
