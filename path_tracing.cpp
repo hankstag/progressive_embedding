@@ -242,7 +242,7 @@ void path_tracing(
     Eigen::VectorXd min_d_;
     Eigen::VectorXi prev_;
     std::set<int> x_;
-    igl::dijkstra(V,F,J,T.first,{T.second},min_d_,prev_);
+    igl::dijkstra(V,J,T.first,{T.second},min_d_,prev_);
     igl::dijkstra(T.second, prev_, E);
     if(E.size() == 1){
         direct_geodesic(V,F,Mask,no_enter_f,TT,T.first,T.second,Vn,Fn,E);

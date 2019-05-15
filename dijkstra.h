@@ -91,11 +91,10 @@ namespace igl {
   //   min_distance     #V by 1 list of the minimum distances from source to all vertices
   //   previous         #V by 1 list of the previous visited vertices (for each vertex) - used for backtracking
   //
-  template <typename IndexType, typename DerivedV, typename DerivedF,
+  template <typename IndexType, typename DerivedV,
   typename DerivedD, typename DerivedP>
   IGL_INLINE int dijkstra(
     const Eigen::MatrixBase<DerivedV> &V,
-    const Eigen::MatrixBase<DerivedF> &F,
     const std::vector<std::vector<IndexType> >& VV,
     const IndexType &source,
     const std::set<IndexType> &targets,

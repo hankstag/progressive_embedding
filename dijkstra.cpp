@@ -81,11 +81,10 @@ IGL_INLINE void igl::dijkstra(
 }
 
 
-template <typename IndexType, typename DerivedV, typename DerivedF,
+template <typename IndexType, typename DerivedV,
 typename DerivedD, typename DerivedP>
 IGL_INLINE int igl::dijkstra(
   const Eigen::MatrixBase<DerivedV> &V,
-  const Eigen::MatrixBase<DerivedF> &F,
   const std::vector<std::vector<IndexType> >& VV,
   const IndexType &source,
   const std::set<IndexType> &targets,
