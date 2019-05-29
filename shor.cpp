@@ -1,5 +1,6 @@
 #include "shor.h"
-#include "plot.h"
+#include <igl/PI.h>
+#include <igl/doublearea.h>
 #include <igl/boundary_loop.h>
 #include <igl/adjacency_list.h>
 

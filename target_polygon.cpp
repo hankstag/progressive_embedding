@@ -7,7 +7,6 @@
 #include <igl/sortrows.h>
 #include <iostream>
 #include <deque>
-#include <igl/opengl/glfw/Viewer.h>
 
 using namespace std;
 
@@ -89,7 +88,6 @@ void background_mesh(
     //     //vr.data().add_points(P.row(i),Eigen::RowVector3d(1,0,0));
     //     //vr.data().add_label(P.row(i),std::to_string(i));
     // }
-    igl::opengl::glfw::Viewer viewer;
     // for(int i=0;i<P.rows();i++){
     //     viewer.data().add_points(P.row(i),Eigen::RowVector3d(1,0,0));
     // }

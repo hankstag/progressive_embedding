@@ -1,7 +1,6 @@
 #include "decompose_polygon.h"
 #include "is_simple_polygon.h"
 #include "embed_points.h"
-#include "plot.h"
 #include <igl/triangle_triangle_adjacency.h>
 #include <igl/copyleft/cgal/orient2D.h>
 
@@ -104,6 +103,5 @@ void decompose_polygon(
   bool succ = Shor_van_wyck(P,R,"",V,F,false);
   assert(succ && "Shor failed");
   embed_points(C,V,F);
-  igl::opengl::glfw::Viewer vr;
   merge_triangles(V,F,L);
 }

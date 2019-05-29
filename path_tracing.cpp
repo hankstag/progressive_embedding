@@ -3,7 +3,6 @@
 #include <igl/matrix_to_list.h>
 #include <igl/triangle_triangle_adjacency.h>
 #include <iostream>
-#include <igl/opengl/glfw/Viewer.h>
 #include "dijkstra.h"
 // #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 // #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>

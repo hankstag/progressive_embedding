@@ -42,8 +42,7 @@ local_smooth/local_smooth.cpp)
 
 add_library(shor_van_wyck 
 shor.cpp
-is_simple_polygon.cpp
-plot.cpp)
+is_simple_polygon.cpp )
 
 
 add_library(match_maker
@@ -54,28 +53,19 @@ add_library(match_maker
     mst.cpp
     decompose_polygon.cpp
     embed_points.cpp
-    plot.cpp
     loader.cpp
 )
 
+add_executable(matchmaker_bin main.cpp plot.cpp)
+add_executable(convex_bin map_to_convex.cpp plot.cpp loader.cpp)
 
-set(MAPTOCONVEX_FILES
-  map_to_convex.cpp
-  plot.cpp
-  loader.cpp
-)
-
-
-add_executable(matchmaker_bin main.cpp)
-
-add_executable(convex_bin ${MAPTOCONVEX_FILES})
-target_link_libraries(progressive_embedding PUBLIC igl::core igl::triangle igl::opengl_glfw igl::cgal igl::opengl_glfw_imgui tbb_static)
-target_link_libraries(shor_van_wyck PUBLIC igl::core igl::triangle igl::cgal igl::opengl_glfw igl::opengl_glfw_imgui)
+target_link_libraries(progressive_embedding PUBLIC igl::core igl::triangle igl::cgal tbb_static)
+target_link_libraries(shor_van_wyck PUBLIC igl::core igl::triangle igl::cgal)
 target_include_directories(progressive_embedding SYSTEM PUBLIC ${THIRD_PARTY_DIR}/tbb/include)
 
 target_link_libraries(match_maker PUBLIC progressive_embedding shor_van_wyck)
 target_include_directories(match_maker PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-target_link_libraries(matchmaker_bin match_maker)
-target_link_libraries(convex_bin PUBLIC progressive_embedding shor_van_wyck)
+target_link_libraries(matchmaker_bin match_maker igl::opengl_glfw igl::opengl_glfw_imgui igl::opengl)
+target_link_libraries(convex_bin PUBLIC progressive_embedding shor_van_wyck igl::opengl_glfw igl::opengl_glfw_imgui)
 

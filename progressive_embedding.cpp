@@ -6,10 +6,8 @@
 #include <igl/boundary_loop.h>
 #include <igl/slice.h>
 
-#include "plot.h"
-#include <igl/opengl/glfw/Viewer.h>
-#include <igl/opengl/glfw/imgui/ImGuiMenu.h>
-#include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
+#include <igl/PI.h>
+#include <igl/doublearea.h>
 #include <igl/Timer.h>
 
 #include <limits>
@@ -546,8 +544,5 @@ bool progressive_embedding(
   std::reverse(L.begin(),L.end());
   insert_vertex_back(L,B,V,F,uv,eps);
   
-  igl::opengl::glfw::Viewer vr;
-  vr.data().set_mesh(uv,F);
-  vr.launch();
   return true;
 }

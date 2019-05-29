@@ -3,14 +3,10 @@
 #include "mst.h"
 #include "cut_mesh/HalfEdgeIterator.h"
 #include "edge_split.h"
-#include "plot.h"
 
 #include <igl/vertex_triangle_adjacency.h>
-#include <igl/opengl/glfw/Viewer.h>
 #include <igl/boundary_loop.h>
 #include <igl/matrix_to_list.h>
-// #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
-// #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
 #include <igl/doublearea.h>
 
 #include <unordered_map>
@@ -419,8 +415,6 @@ void match_maker(
   boundary_straightening(P);
   Eigen::VectorXi H(P.rows());
   H.setZero();
-  igl::opengl::glfw::Viewer vr;
-  //plot_polygon(vr,H,P);
   remove_ears(V,F);
   // [ use Shor to get list of polygons ]
   Eigen::MatrixXd V2;
