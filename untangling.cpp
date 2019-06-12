@@ -1,4 +1,6 @@
 #include <igl/boundary_loop.h>
+#include <igl/map_vertices_to_circle.h>
+#include <igl/harmonic.h>
 #include <igl/Timer.h>
 #include "progressive_embedding.h"
 #include "validity_check.h"
@@ -19,8 +21,10 @@ int main(int argc, char *argv[])
   int threshold;
   std::string model,outfile;
   
+  bool existing = false; // whether initial map is contained in texture coordinate
   cmdl("-in") >> model;
   cmdl("-t",20) >> threshold;
+  cmdl("-e",false) >> existing;
   cmdl("-o", model+"_out.obj") >> outfile;
   double eps = std::pow(10,threshold);
   
@@ -32,6 +36,11 @@ int main(int argc, char *argv[])
   Eigen::VectorXi b;
   Eigen::MatrixXd bc;
   igl::boundary_loop(F,b);
+
+  if(!existing){
+    igl::map_vertices_to_circle(V,b,bc);
+    igl::harmonic(F,b,bc,1,uv);
+  }
 
   igl::Timer tm;
   tm.start();

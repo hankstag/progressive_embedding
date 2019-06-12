@@ -86,6 +86,7 @@ int main(int argc, char *argv[])
   slim_precompute(V,F,uv,sData,igl::SLIMData::SYMMETRIC_DIRICHLET,ci,c,0,true,E,1.0);
   igl::opengl::glfw::Viewer vr;
   vr.data().set_mesh(V,F);
+  double scale = 1.0;
   auto key_down = [&](
     igl::opengl::glfw::Viewer& viewer, unsigned char key, int modifier
   ){
@@ -93,6 +94,8 @@ int main(int argc, char *argv[])
       slim_solve(sData,20,E);
       viewer.data().clear();
       viewer.data().set_mesh(V,F);
+      for(int i=0;i<3;i++)
+        viewer.data().add_points(V.row(ci(i)),Eigen::RowVector3d(1,0,0));
       viewer.core().align_camera_center(V);
       viewer.data().set_uv(sData.V_o,F);
       viewer.data().show_texture = true;
@@ -101,8 +104,24 @@ int main(int argc, char *argv[])
       slim_solve(sData,20,E);
       viewer.data().clear();
       viewer.data().set_mesh(sData.V_o,F);
+      for(int i=0;i<3;i++)
+        viewer.data().add_points(sData.V_o.row(ci(i)),Eigen::RowVector3d(1,0,0));
       viewer.core().align_camera_center(sData.V_o);
       viewer.data().show_texture = false;
+    }
+    if(key == ','){
+      scale *= 2.0;
+      viewer.data().set_mesh(V,F);
+      viewer.core().align_camera_center(V);
+      viewer.data().set_uv(sData.V_o*scale,F);
+      viewer.data().show_texture = true;
+    }
+    if(key == '.'){
+      scale /= 2.0;
+      viewer.data().set_mesh(V,F);
+      viewer.core().align_camera_center(V);
+      viewer.data().set_uv(sData.V_o*scale,F);
+      viewer.data().show_texture = true;
     }
     return false;
   };
