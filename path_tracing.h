@@ -5,7 +5,7 @@
 #include <set>
 
 // tracing path in mesh
-void path_tracing(
+bool path_tracing(
     const Eigen::MatrixXd& V,
     const Eigen::MatrixXi& F,
     const std::pair<int,int>& T,

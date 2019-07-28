@@ -176,7 +176,7 @@ void direct_geodesic(
 	Fn = tF;
 }
 
-void path_tracing(
+bool path_tracing(
     const Eigen::MatrixXd& V,
     const Eigen::MatrixXi& F,
     const std::pair<int,int>& T,
@@ -244,6 +244,7 @@ void path_tracing(
     igl::dijkstra(V,J,T.first,{T.second},min_d_,prev_);
     igl::dijkstra(T.second, prev_, E);
     if(E.size() == 1){
-        direct_geodesic(V,F,Mask,no_enter_f,TT,T.first,T.second,Vn,Fn,E);
+        return false;
     }
+    return true;
 }
