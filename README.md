@@ -1,6 +1,6 @@
 # Progressive Embedding
 
-![](figure/teaser.pdf)
+![](figure/teaser.png)
 
 [Hanxiao Shen](http://cs.nyu.edu/~hanxiao/) [Zhongshi Jiang](http://cs.nyu.edu/~zhongshi/), [Denis Zorin](https://cims.nyu.edu/gcl/denis.html), [Daniele Panozzo](http://cs.nyu.edu/~panozzo/)<br/>
 *ACM Transaction on Graphics (Proceedings of SIGGRAPH 2019)*<br/>
