@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
   
   bool existing = false; // whether initial map is contained in texture coordinate
   cmdl("-in") >> model;
-  cmdl("-t",20) >> threshold;
+  cmdl("-t",15) >> threshold;
   cmdl("-e",false) >> existing;
   cmdl("-o", model+"_out.obj") >> outfile;
   double eps = std::pow(10,threshold);

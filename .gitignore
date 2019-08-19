@@ -35,4 +35,4 @@ ext/*
 debug/*
 build/*
 .vscode/*
-
+data/*

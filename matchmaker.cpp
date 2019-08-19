@@ -478,7 +478,20 @@ void post_processing(
       // Eigen::MatrixXd CN;
       // Eigen::MatrixXi FN;
       // fix the map
-      progressive_embedding(PV[k],kF,Puv[k],fix,fix_pos,1e15);
+      bool succ = false;
+      double col_eps = 1e15;
+      do{
+        auto PV_s = PV[k];
+        auto kF_s = kF;
+        auto Puv_s = Puv[k];
+        succ = progressive_embedding(PV[k],kF,Puv[k],fix,fix_pos,col_eps);
+        if(!succ){ // greedily push harder in terms of collapsed region to speed up processing
+          PV[k] = PV_s;
+          kF = kF_s;
+          Puv[k] = Puv_s;
+          col_eps /= 10;
+        }
+      }while(!succ);
       // copy new positions to global mesh
       for(int i=0;i<uv.rows();i++){
         if(II(i) != -1)

@@ -76,10 +76,19 @@ set(RANDOMINIT_FILES
   loader.cpp
 )
 
+set(TEST_LOCAL_SMOOTHING
+
+  test_local_smoothing.cpp
+  plot.cpp
+  loader.cpp
+  
+)
+
 add_executable(matchmaker_bin ${MATCHMAKER_FILES})
 add_executable(genus_zero_tutte_bin ${GENUSZERO_FILES})
 add_executable(untangle_bin ${UNTANGLE_FILES})
 add_executable(random_init_bin ${RANDOMINIT_FILES})
+add_executable(test_local_smoothing_bin ${TEST_LOCAL_SMOOTHING})
 
 target_link_libraries(progressive_embedding igl::core igl::triangle igl::opengl_glfw igl::cgal igl::opengl_glfw_imgui tbb_static)
 target_link_libraries(shor_van_wyck igl::core igl::triangle igl::cgal igl::opengl_glfw igl::opengl_glfw_imgui)
@@ -89,4 +98,5 @@ target_link_libraries(matchmaker_bin progressive_embedding shor_van_wyck)
 target_link_libraries(genus_zero_tutte_bin progressive_embedding shor_van_wyck)
 target_link_libraries(untangle_bin progressive_embedding shor_van_wyck)
 target_link_libraries(random_init_bin progressive_embedding shor_van_wyck)
+target_link_libraries(test_local_smoothing_bin progressive_embedding shor_van_wyck)
 

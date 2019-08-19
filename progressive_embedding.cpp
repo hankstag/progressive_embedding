@@ -240,7 +240,9 @@ std::pair<bool,double> flip_avoid_line_search(
         y = pt;
     }
   }
-  if(max_energy > eps)  valid = false;
+  
+  // set invalid elements upper-bound energy 1e20
+  if(max_energy > 1e20)  valid = false;
   return std::make_pair(valid,max_energy);
 }
 
@@ -318,7 +320,8 @@ void collapse_invalid_elements(
       }
     }
     num_invalid = I.sum();
-    //std::cout<<"invalid size "<<num_invalid<<std::endl;
+    // check_result(uv,F,G);
+    // std::cout<<"invalid size "<<num_invalid<<std::endl;
 
     layer = do_collapse ? 0 : layer+1;
     if(do_collapse) continue;
@@ -352,7 +355,7 @@ bool insert_vertex_back(
   igl::Timer timer;
   timer.start();
   double total_time = 0.0;
-
+  int local_itr = 0;
   for(int ii=0;ii<L.size();ii++){
     
     double avg = domain_area / n_face;
@@ -422,6 +425,7 @@ bool insert_vertex_back(
       Eigen::MatrixXi Ft;
       drop_empty_faces(F,Ft);
       local_smoothing(V,Ft,B,uv,10,1e10,avg);
+      local_itr = 0; // reset record
     }else{
       F = F_store;
       uv = uv_store;
@@ -429,6 +433,7 @@ bool insert_vertex_back(
       drop_empty_faces(F,Ft);
       local_smoothing(V,Ft,B,uv,100,1e10,avg);
       ii--;
+      local_itr++;
     }
 
     double time2 = timer.getElapsedTime();
@@ -438,7 +443,8 @@ bool insert_vertex_back(
     int second = (expect_total_time-total_time) - 60*minute;
     std::cerr<<"expect time: "<<minute<<" mins "<<second<<" seconds";
     std::cerr<<'\r';
-
+    if(local_itr > 50)
+      return false;
   }
   std::cout<<std::endl;
   return true;
@@ -526,10 +532,6 @@ bool progressive_embedding(
 
   // [ invert vertex in reverse order of L ]
   std::reverse(L.begin(),L.end());
-  insert_vertex_back(L,B,V,F,uv,eps);
-  
-  // igl::opengl::glfw::Viewer vr;
-  // vr.data().set_mesh(uv,F);
-  // vr.launch();
-  return true;
+  bool succ = insert_vertex_back(L,B,V,F,uv,eps);
+  return succ;
 }

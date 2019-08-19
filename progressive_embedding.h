@@ -13,4 +13,10 @@ bool progressive_embedding(
   bool verbose=false
 );
 
+void check_result(
+  const Eigen::MatrixXd& uv,
+  const Eigen::MatrixXi& F,
+  const Eigen::Matrix<double,2,3>& G
+);
+
 #endif

@@ -1,5 +1,7 @@
 # Progressive Embedding
 
+![](figure/teaser.pdf)
+
 [Hanxiao Shen](http://cs.nyu.edu/~hanxiao/) [Zhongshi Jiang](http://cs.nyu.edu/~zhongshi/), [Denis Zorin](https://cims.nyu.edu/gcl/denis.html), [Daniele Panozzo](http://cs.nyu.edu/~panozzo/)<br/>
 *ACM Transaction on Graphics (Proceedings of SIGGRAPH 2019)*<br/>
 DOI: 10.1145/3306346.3323012
@@ -52,4 +54,8 @@ strictly satisfying the constraints using MatchMaker++:
 ```
 ./matchmaker_bin --in ../data/camel_miq.obj
 ```
+
+## Data
+
+To download the result data in our paper, please checkout this [link](https://drive.google.com/file/d/1caGIzPd9trlx0EvBbE06S2L3g1kHvIwJ/view?usp=sharing).
 
