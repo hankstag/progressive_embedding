@@ -4,7 +4,7 @@
 #include <igl/adjacency_list.h>
 
 #include <igl/copyleft/cgal/orient2D.h>
-#include <igl/copyleft/cgal/ear_clipping.h>
+#include <igl/predicates/ear_clipping.h>
 #include "is_simple_polygon.h"
 #include <iostream>
 
@@ -388,7 +388,7 @@ bool Shor_van_wyck(
   Eigen::MatrixXi eF;
   Eigen::MatrixXd nP;
   Eigen::VectorXi nR;
-  igl::copyleft::cgal::ear_clipping(mP,mR,D,eF,nP);
+  igl::predicates::ear_clipping(mP,mR,D,eF,nP);
   igl::slice(mR,D,1,nR);
 
   // [weakly-self-overlapping test]

@@ -7,7 +7,7 @@
 
 #include "is_simple_polygon.h"
 #include <igl/copyleft/cgal/orient2D.h>
-#include <igl/copyleft/cgal/segment_segment_intersect.h>
+#include <igl/predicates/segment_segment_intersect.h>
 
 
 typedef std::tuple<double,double,int> Point;
@@ -89,11 +89,12 @@ bool disjoint_segment_intersect(
         else
             return false;
     }
-    double a[2] = {std::get<0>(std::get<0>(s1)),std::get<1>(std::get<0>(s1))};
-    double b[2] = {std::get<0>(std::get<1>(s1)),std::get<1>(std::get<1>(s1))};
-    double c[2] = {std::get<0>(std::get<0>(s2)),std::get<1>(std::get<0>(s2))};
-    double d[2] = {std::get<0>(std::get<1>(s2)),std::get<1>(std::get<1>(s2))};
-    return igl::copyleft::cgal::segment_segment_intersect(a,b,c,d,0.0);
+    Eigen::RowVector2d a,b,c,d;
+    a << std::get<0>(std::get<0>(s1)),std::get<1>(std::get<0>(s1));
+    b << std::get<0>(std::get<1>(s1)),std::get<1>(std::get<1>(s1));
+    c << std::get<0>(std::get<0>(s2)),std::get<1>(std::get<0>(s2));
+    d << std::get<0>(std::get<1>(s2)),std::get<1>(std::get<1>(s2));
+    return igl::predicates::segment_segment_intersect(a,b,c,d);
 }
 
 bool is_simple_polygon(const Eigen::MatrixXd& P){

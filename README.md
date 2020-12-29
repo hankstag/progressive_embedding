@@ -11,16 +11,6 @@ Tutte embedding is one of the most common building blocks in geome- try processi
 We propose Progressive Embedding, with similar theoretical guarantees to Tutte embedding, but more resilient to the rounding error of floating point arithmetic. Inspired by progressive meshes, we collapse edges on an invalid embedding to a valid, simplified mesh, then insert points back while maintaining validity. We demonstrate the robustness of our method by computing embeddings for a large collection of disk topology meshes.
 By combining our robust embedding with a variant of the matchmaker algorithm, we propose a general algorithm for the problem of mapping multiply connected domains with arbitrary hard constraints to the plane, with applications in texture mapping and remeshing.
 
-## Dependency
-
-This implementation currently is based on my forked version of [libigl](https://github.com/hankstag/libigl/tree/Shor). Please use the following cmds to get libigl and swtich to shor branch:
-```
-git clone https://github.com/hankstag/libigl.git
-cd libigl
-git fetch
-git checkout Shor
-```
-
 ## To compile
 
 Use the following cmds:

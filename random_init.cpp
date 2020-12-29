@@ -8,7 +8,7 @@
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include <igl/map_vertices_to_circle.h>
-#include <igl/copyleft/cgal/point_inside_polygon.h>
+#include <igl/predicates/point_inside_convex_polygon.h>
 #include <cstdlib>
 #include "loader.h"
 #include <ctime>
