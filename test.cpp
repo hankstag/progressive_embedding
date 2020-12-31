@@ -77,6 +77,7 @@ int main(int argc, char *argv[])
     igl::facet_components(F, f_compo);
     assert(f_compo.maxCoeff() == 1);
     
+
     // get local_F and local_V
     std::vector<Eigen::MatrixXd> local_V(2);
     std::vector<Eigen::MatrixXi> local_F(2);
@@ -86,16 +87,26 @@ int main(int argc, char *argv[])
         Eigen::MatrixXi F_tmp;
         for (int j = 0; j < f_compo.rows(); j++)
         {
-            if (f_compo(j) != patch_id)  // TODO: check this
+            if (f_compo(j) == patch_id)
             {
                 F_tmp.conservativeResize(F_tmp.rows() + 1, 3);
                 F_tmp.row(F_tmp.rows() - 1) = F.row(j);
             }
         }
-
         igl::remove_unreferenced(V, F_tmp, local_V[patch_id], local_F[patch_id], IIs[patch_id], JJs[patch_id]);
         // std::cout << local_F[patch_id].rows() << std::endl;
     }
+
+    // check patch_id consistant
+    int one_v = corres[std::pair<int, int>(bds_uv[0][0], bds_uv[0][1])][0];
+    if (IIs[1][one_v] != -1)
+    {
+        std::cout << "need swap patches" << std::endl;
+        auto tmp = bds_uv[0];
+        bds_uv[0] = bds_uv[1];
+        bds_uv[1] = tmp;
+    }
+
     // igl::opengl::glfw::Viewer viewer;
     // viewer.data().set_mesh(uv, F_uv);
     // viewer.launch();
