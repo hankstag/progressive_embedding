@@ -21,6 +21,11 @@ add_library(shor_van_wyck
   plot.cpp
 )
 
+add_library(matchmaker
+  edge_split.cpp path_tracing.cpp target_polygon.cpp matchmaker.cpp 
+  mst.cpp decompose_polygon.cpp embed_points.cpp plot.cpp
+)
+
 set(MATCHMAKER_FILES
     main.cpp
     edge_split.cpp
@@ -59,6 +64,8 @@ add_executable(random_init_bin ${RANDOMINIT_FILES})
 
 target_link_libraries(progressive_embedding igl::core igl::triangle igl::opengl_glfw igl::cgal igl::predicates igl::opengl_glfw_imgui tbb_static)
 target_link_libraries(shor_van_wyck igl::core igl::triangle igl::cgal igl::opengl_glfw igl::opengl_glfw_imgui igl::predicates)
+target_link_libraries(matchmaker shor_van_wyck)
+target_include_directories(matchmaker PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(progressive_embedding SYSTEM PUBLIC ${THIRD_PARTY_DIR}/tbb/include)
 
 target_link_libraries(matchmaker_bin progressive_embedding shor_van_wyck)
