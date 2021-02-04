@@ -11,6 +11,7 @@ void decompose_polygon(
   const Eigen::MatrixXd& P,
   const Eigen::VectorXi& R,
   const Eigen::MatrixXd& C,
+  const Eigen::VectorXi& mark,
   Eigen::MatrixXd& V,
   Eigen::MatrixXi& F, 
   std::vector<std::vector<int>>& L
