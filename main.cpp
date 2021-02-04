@@ -75,8 +75,10 @@ int main(int argc, char *argv[])
     R.setZero(polys[0].rows());
     polygon = polys[0];
   }
-  
-  match_maker(V,F,uv,c,ci,R,T,polygon);
+  Eigen::VectorXi mark(R.rows() + c.rows());
+  mark.setConstant(1);
+
+  match_maker(V,F,uv,c,ci,R,T,polygon,mark);
   
   igl::SLIMData sData;
   sData.slim_energy = igl::SLIMData::SYMMETRIC_DIRICHLET;
