@@ -57,19 +57,7 @@ set(RANDOMINIT_FILES
   loader.cpp
 )
 
-add_executable(matchmaker_bin ${MATCHMAKER_FILES})
-add_executable(genus_zero_tutte_bin ${GENUSZERO_FILES})
-add_executable(untangle_bin ${UNTANGLE_FILES})
-add_executable(random_init_bin ${RANDOMINIT_FILES})
-
 target_link_libraries(progressive_embedding igl::core igl::triangle igl::opengl_glfw igl::cgal igl::predicates igl::opengl_glfw_imgui tbb_static)
 target_link_libraries(shor_van_wyck igl::core igl::triangle igl::cgal igl::opengl_glfw igl::opengl_glfw_imgui igl::predicates)
 target_link_libraries(matchmaker shor_van_wyck progressive_embedding)
 target_include_directories(matchmaker PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(progressive_embedding SYSTEM PUBLIC ${THIRD_PARTY_DIR}/tbb/include)
-
-target_link_libraries(matchmaker_bin progressive_embedding shor_van_wyck)
-target_link_libraries(genus_zero_tutte_bin progressive_embedding shor_van_wyck)
-target_link_libraries(untangle_bin progressive_embedding shor_van_wyck)
-target_link_libraries(random_init_bin progressive_embedding shor_van_wyck)
-

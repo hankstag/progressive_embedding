@@ -67,7 +67,8 @@ void boundary_straightening(
 // non-consecutive boundary vertices
 void remove_ears(
     Eigen::MatrixXd &V,
-    Eigen::MatrixXi &F)
+    Eigen::MatrixXi &F,
+    std::vector<fData>& props)
 {
   // get rid of ears
   Eigen::VectorXi bd;
@@ -82,6 +83,12 @@ void remove_ears(
 
   Eigen::MatrixXi TT, TTi;
   igl::triangle_triangle_adjacency(F, TT, TTi);
+  std::vector<std::vector<int>> F_vec, TT_vec, TTi_vec;
+  std::vector<std::vector<double>> V_vec;
+  igl::matrix_to_list(F, F_vec);
+  igl::matrix_to_list(V, V_vec);
+  igl::matrix_to_list(TT, TT_vec);
+  igl::matrix_to_list(TTi, TTi_vec);
   for (int i = 0; i < F.rows(); i++)
   {
     bool all_constrained = true;
@@ -91,10 +98,13 @@ void remove_ears(
       bool a2 = (is_constrained.find(F(i, (k + 1) % 3)) == is_constrained.end());
       if (!a1 && !a2 && std::abs(mm[F(i, k)] - mm[F(i, (k + 1) % 3)]) != 1)
       {
-        edge_split(V, F, TT, TTi, i, k);
+        edge_split(V_vec, F_vec, TT_vec, TTi_vec, props, i, k);
       }
     }
   }
+  igl::list_to_matrix(F_vec, F);
+  igl::list_to_matrix(V_vec, V);
+
 }
 
 // based on the polygon list build a graph
@@ -560,6 +570,7 @@ void post_processing(
 void match_maker(
     Eigen::MatrixXd &V,
     Eigen::MatrixXi &F,
+    std::vector<fData>& props,
     Eigen::MatrixXd &uv,
     const Eigen::MatrixXd &c,
     const Eigen::VectorXi &ci,
@@ -576,7 +587,7 @@ void match_maker(
   H.setZero();
   //igl::opengl::glfw::Viewer vr;
   //plot_polygon(vr,H,P);
-  remove_ears(V, F);
+  remove_ears(V, F, props);
   // [ use Shor to get list of polygons ]
   Eigen::MatrixXd V2;
   Eigen::MatrixXi F2;
@@ -757,7 +768,7 @@ void match_maker(
         if (on_path_v.find(F_vec[i][k]) != on_path_v.end() &&
             on_path_v.find(F_vec[i][(k + 1) % 3]) != on_path_v.end())
         {
-          bool status = edge_split(V_vec, F_vec, TT_vec, TTi_vec, i, k);
+          bool status = edge_split(V_vec, F_vec, TT_vec, TTi_vec, props, i, k);
           assert(status != false && "split boundary");
         }
       }
