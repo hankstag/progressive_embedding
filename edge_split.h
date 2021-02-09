@@ -3,7 +3,7 @@
 
 #include <Eigen/Core>
 #include <vector>
-#include "fData.h"
+#include "Property.h"
 
 bool edge_split(
     std::vector<std::vector<double>>& V0,
@@ -28,7 +28,7 @@ bool edge_split(
   std::vector<std::vector<int>>& F0,
   std::vector<std::vector<int>>& FF_vec,
   std::vector<std::vector<int>>& FFi_vec,
-  std::vector<fData>& props,
+  std::vector<Property>& props,
   int f0,
   int e0
 );

@@ -26,6 +26,10 @@ add_library(matchmaker
   mst.cpp decompose_polygon.cpp embed_points.cpp plot.cpp validity_check.cpp
 )
 
+add_library(property
+  Property.cpp
+)
+
 set(MATCHMAKER_FILES
     main.cpp
     edge_split.cpp
@@ -59,5 +63,7 @@ set(RANDOMINIT_FILES
 
 target_link_libraries(progressive_embedding igl::core igl::triangle igl::opengl_glfw igl::cgal igl::predicates igl::opengl_glfw_imgui tbb_static)
 target_link_libraries(shor_van_wyck igl::core igl::triangle igl::cgal igl::opengl_glfw igl::opengl_glfw_imgui igl::predicates)
-target_link_libraries(matchmaker shor_van_wyck progressive_embedding)
+target_link_libraries(property igl::core)
+target_link_libraries(matchmaker shor_van_wyck progressive_embedding property)
 target_include_directories(matchmaker PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(property PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

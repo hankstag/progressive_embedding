@@ -3,7 +3,7 @@
 
 #include "shor.h"
 #include "path_tracing.h"
-#include "fData.h"
+#include "Property.h"
 #include <igl/harmonic.h>
 
 // given a polygon P and a source mesh M (their boundaries matches in #v)
@@ -11,7 +11,7 @@
 void match_maker(
     Eigen::MatrixXd &V,
     Eigen::MatrixXi &F,
-    std::vector<fData>& props,
+    std::vector<Property>& props,
     Eigen::MatrixXd &uv,
     const Eigen::MatrixXd &c,
     const Eigen::VectorXi &ci,
@@ -21,6 +21,6 @@ void match_maker(
     const Eigen::VectorXi &mark
 );
 
-void remove_ears(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::vector<fData>& props);
+void remove_ears(Eigen::MatrixXd &V, Eigen::MatrixXi &F, std::vector<Property>& props);
 
 #endif

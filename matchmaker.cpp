@@ -68,7 +68,7 @@ void boundary_straightening(
 void remove_ears(
     Eigen::MatrixXd &V,
     Eigen::MatrixXi &F,
-    std::vector<fData>& props)
+    std::vector<Property>& props)
 {
   // get rid of ears
   Eigen::VectorXi bd;
@@ -570,7 +570,7 @@ void post_processing(
 void match_maker(
     Eigen::MatrixXd &V,
     Eigen::MatrixXi &F,
-    std::vector<fData>& props,
+    std::vector<Property>& props,
     Eigen::MatrixXd &uv,
     const Eigen::MatrixXd &c,
     const Eigen::VectorXi &ci,
