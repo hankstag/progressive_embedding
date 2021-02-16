@@ -5,6 +5,8 @@
 #include "local_smooth/auto_grad.hpp"
 #include <igl/boundary_loop.h>
 #include <igl/slice.h>
+#include <igl/remove_unreferenced.h>
+#include <igl/predicates/point_inside_convex_polygon.h>
 
 #include "plot.h"
 #include <igl/opengl/glfw/Viewer.h>
@@ -246,6 +248,26 @@ std::pair<bool,double> flip_avoid_line_search(
   return std::make_pair(valid,max_energy);
 }
 
+// collect the set of non-boundary vertices for a given mesh
+// note that unreferenced vertices are excluded
+std::set<int> get_interior_vertices(
+  const Eigen::MatrixXd& V,
+  const Eigen::MatrixXi& F
+){
+
+  std::set<int> interior;
+  Eigen::MatrixXd Vn; Eigen::MatrixXi Fn;
+  Eigen::VectorXi I, J;
+  igl::remove_unreferenced(V, F, Vn, Fn, I, J);
+  auto is_bd = igl::is_border_vertex(Fn);
+  for(int i = 0; i < Vn.rows(); i++){
+    if(!is_bd[i])
+      interior.insert(J(i));
+  }
+  return interior;
+
+}
+
 using Action = std::tuple<int,int,Eigen::MatrixXi,std::vector<int>>;
 
 void collapse_invalid_elements(
@@ -321,7 +343,29 @@ void collapse_invalid_elements(
     }
     num_invalid = I.sum();
     // check_result(uv,F,G);
-    // std::cout<<"invalid size "<<num_invalid<<std::endl;
+    auto interior_vt = get_interior_vertices(uv, F);
+    if(interior_vt.size() == 1){ 
+      // when there's only one interior vertex
+      // move it to the barycenter of the boundary
+      Eigen::VectorXi bd;
+      igl::boundary_loop(F, bd);
+      Eigen::RowVector2d bc(1, 2);
+      bc.setZero();
+      Eigen::Matrix<double,Eigen::Dynamic,2> polygon(bd.rows(), 2);
+      for(int i = 0; i < bd.rows(); i++){
+        polygon.row(i) << uv(bd(i), 0), uv(bd(i), 1);
+        bc(0) += uv(bd(i), 0);
+        bc(1) += uv(bd(i), 1);
+      }
+      bc /= bd.rows();
+      uv.row(*interior_vt.begin()) << bc;
+      if(!igl::predicates::point_inside_convex_polygon(polygon, bc)){
+        std::cout<<"move the only interior vertex to barycenter of polygon failed.\n";
+        exit(0);
+      }
+
+    }
+    std::cout<<"invalid size "<<num_invalid<<std::endl;
 
     layer = do_collapse ? 0 : layer+1;
     if(do_collapse) continue;
