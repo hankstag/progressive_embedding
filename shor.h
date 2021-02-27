@@ -145,4 +145,14 @@ bool Shor_van_wyck(
   bool do_refine=true // false meaning no internal vertices
 );
 
+bool Shor_van_wyck_v2(
+  const Eigen::MatrixXd& P,
+  const Eigen::VectorXi& R,
+  const Eigen::VectorXi& mark,
+  const std::string flags,
+  Eigen::MatrixXd& V,
+  Eigen::MatrixXi& F,
+  bool do_refine
+);
+
 #endif

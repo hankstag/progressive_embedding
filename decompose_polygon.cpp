@@ -309,7 +309,7 @@ void decompose_polygon(
     std::vector<std::vector<int>> &L)
 {
 
-  bool succ = Shor_van_wyck(P, R, "", V, F, false);
+  bool succ = Shor_van_wyck_v2(P, R, mark, "", V, F, false);
   assert(succ && "Shor failed");
   embed_points(C, V, F);
   igl::opengl::glfw::Viewer vr;

@@ -159,6 +159,35 @@ void drop_colinear(
   igl::slice(R,B,mR);
 }
 
+void drop_colinear_v2(
+  const Eigen::MatrixXd& P,
+  const Eigen::VectorXi& R,
+  const Eigen::VectorXi& mark,
+  Eigen::VectorXi& B,
+  Eigen::MatrixXd& mP,
+  Eigen::VectorXi& mR
+){
+  int dropped = 0;
+  int N = P.rows();
+  std::vector<int> Bv;
+  std::cout<<"mark size: "<<mark.rows()<<std::endl;
+  std::cout<<"N: "<<N<<std::endl;
+  for(int i=0;i<N;i++){
+    int a = (i-1+N)%N;
+    int v = i;
+    int b = (i+1)%N;
+    Eigen::Matrix<double,3,2> T;
+    T<<P.row(a),P.row(v),P.row(b);
+    if(R(v)!=0 || mark(v)!=0){ // non-colinear or rotate index nonzero
+      Bv.push_back(v);
+    }else
+      dropped++;
+  }
+  igl::list_to_matrix(Bv,B);
+  igl::slice(P,B,1,mP);
+  igl::slice(R,B,mR);
+}
+
 void add_colinear(
   const Eigen::MatrixXd& P,
   const Eigen::MatrixXi& nF,
@@ -382,6 +411,67 @@ bool Shor_van_wyck(
   Eigen::MatrixXd mP; // P \ colinear vertices
   Eigen::VectorXi mR;
   drop_colinear(P,R,B,mP,mR);
+
+  // [ear clipping]
+  Eigen::VectorXi D;
+  Eigen::MatrixXi eF;
+  Eigen::MatrixXd nP;
+  Eigen::VectorXi nR;
+  igl::predicates::ear_clipping(mP,mR,D,eF,nP);
+  igl::slice(mR,D,1,nR);
+
+  // [weakly-self-overlapping test]
+  Eigen::MatrixXi nF;
+  bool succ = (nP.rows()==0) || weakly_self_overlapping(nP,nR,nF);
+  if(!succ){
+    std::cout<<"shor failed"<<std::endl;
+    exit(0);
+    return false;
+  }
+  // [map simplified index to initial polygon]
+  for(int i=0;i<nF.rows();i++){
+    nF.row(i) << D(nF(i,0)),D(nF(i,1)),D(nF(i,2));
+  }
+  if(eF.rows()>0){
+    nF.conservativeResize(nF.rows()+eF.rows(),3);
+    nF.block(nF.rows()-eF.rows(),0,eF.rows(),3) = eF;
+  }
+
+  // [add back colinear vertices by spliting boundary edges]
+  add_colinear(P,nF,B,F);
+  if(!do_refine){
+    V = P;
+    return true;
+  }
+  V = P;
+
+  // [simplify mesh (subdivide into small polygons)]
+  std::vector<std::vector<int>> L;
+  subdivide_polygon(V,F,L);
+
+  // [refine each small polygon]
+  Eigen::MatrixXd V0 = V;
+  simplify_triangulation(V0,L,V,F);
+  return true;
+}
+
+// the re-implementation of Shor algorithm
+bool Shor_van_wyck_v2(
+  const Eigen::MatrixXd& P,
+  const Eigen::VectorXi& R,
+  const Eigen::VectorXi& mark,
+  const std::string flags,
+  Eigen::MatrixXd& V,
+  Eigen::MatrixXi& F,
+  bool do_refine
+){
+
+  // [drop colinear points]
+  Eigen::VectorXi B; // remaining vertices: non-colinear/rotateindex!=0
+  Eigen::MatrixXd mP; // P \ colinear vertices
+  Eigen::VectorXi mR;
+  drop_colinear_v2(P,R,mark,B,mP,mR);
+  std::cout<<"after removing colinear #P: "<<mP.rows()<<std::endl;
 
   // [ear clipping]
   Eigen::VectorXi D;
