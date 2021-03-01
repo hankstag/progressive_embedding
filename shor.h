@@ -152,6 +152,7 @@ bool Shor_van_wyck_v2(
   const std::string flags,
   Eigen::MatrixXd& V,
   Eigen::MatrixXi& F,
+  Eigen::MatrixXi& Fn,
   bool do_refine
 );
 

@@ -463,6 +463,7 @@ bool Shor_van_wyck_v2(
   const std::string flags,
   Eigen::MatrixXd& V,
   Eigen::MatrixXi& F,
+  Eigen::MatrixXi& Fn,
   bool do_refine
 ){
 
@@ -502,6 +503,13 @@ bool Shor_van_wyck_v2(
   add_colinear(P,nF,B,F);
   if(!do_refine){
     V = P;
+    Fn = nF;
+    // remap Fn vertex id to P
+    for(int i = 0; i < Fn.rows(); i++){
+      for(int k = 0; k < 3; k++){
+        Fn(i,k) = B(Fn(i,k));
+      }
+    }
     return true;
   }
   V = P;

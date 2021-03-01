@@ -44,6 +44,7 @@ bool is_convex(
 void merge_triangles(
     const Eigen::MatrixXd &V,
     const Eigen::MatrixXi &F,
+    const Eigen::MatrixXi &Fn,
     const Eigen::VectorXi &mark,
     std::vector<std::vector<int>> &L)
 {
@@ -54,17 +55,17 @@ void merge_triangles(
   // collect halfedge and corresponding face id
   // initialize L to be collection of all faces(polygons)
   std::map<std::pair<int, int>, int> H;
-  Eigen::VectorXi G(F.rows());
+  Eigen::VectorXi G(Fn.rows());
   Eigen::MatrixXi FF, FFI;
-  igl::triangle_triangle_adjacency(F, FF, FFI);
-  L.resize(F.rows());
-  for (int i = 0; i < F.rows(); i++)
+  igl::triangle_triangle_adjacency(Fn, FF, FFI);
+  L.resize(Fn.rows());
+  for (int i = 0; i < Fn.rows(); i++)
   {
     G(i) = i; // every face belongs to itself
     for (int k = 0; k < 3; k++)
     {
-      L[i].push_back(F(i, k));
-      H[std::make_pair(F(i, k), F(i, (k + 1) % 3))] = FF(i, k);
+      L[i].push_back(Fn(i, k));
+      H[std::make_pair(Fn(i, k), Fn(i, (k + 1) % 3))] = FF(i, k);
     }
   }
 
@@ -308,12 +309,12 @@ void decompose_polygon(
     Eigen::MatrixXi &F,
     std::vector<std::vector<int>> &L)
 {
-
-  bool succ = Shor_van_wyck_v2(P, R, mark, "", V, F, false);
+  Eigen::MatrixXi Fn; // triangulation of only the 'marked' vertices
+  bool succ = Shor_van_wyck_v2(P, R, mark, "", V, F, Fn, false);
   assert(succ && "Shor failed");
   embed_points(C, V, F);
   igl::opengl::glfw::Viewer vr;
   std::cout << V.rows() << " " << mark.rows() << std::endl;
-  merge_triangles(V, F, mark, L);
+  merge_triangles(V, F, Fn, mark, L);
   std::cout << "end of decompose polygon" << std::endl;
 }
