@@ -72,24 +72,39 @@ bool weakly_self_overlapping(
     int i, int k, int j
   ){
     const int N = P.rows();
-    Eigen::Matrix<double,3,2> tri;
-    tri<<P.row(i),P.row(k),P.row(j);
-    if(orientation(tri)<=0) return false;
+    Eigen::RowVector2d pi = P.row(i);
+    Eigen::RowVector2d pk = P.row(k);
+    Eigen::RowVector2d pj = P.row(j);
+    auto r = igl::predicates::orient2d(pi,pk,pj);
+    if(r == igl::predicates::Orientation::COLLINEAR ||
+       r == igl::predicates::Orientation::NEGATIVE)
+       {
+        //  std::cout << "orientation fail" << std::endl;
+         return false;
+
+       }
     
-    Angle I(tri.row(2),tri.row(0),tri.row(1)); // J I K
-    Angle J(tri.row(1),tri.row(2),tri.row(0)); // K J I
+    Angle I(pj,pi,pk); // J I K
+    Angle J(pk,pj,pi); // K J I
     
-    Angle k1 = LA[i][k];        
+    Angle k1 = LA[i][k];
     Angle k2(P.row(i),P.row(k),P.row(j));
     Angle k3 = FA[k][j];
     Angle Fr = I + FA[i][k];
     Angle La = LA[k][j] + J;
-    if((Fr.r <= R(i)) && (La.r <= R(j)) && (k1+k2+k3).r == R(k)){
+    bool ij_2gon = (j+1)%P.rows()==i; // whether Pji is 2gon
+    bool cond_i = ij_2gon ? (Fr.r == R(i)) : (Fr.r <= R(i));
+    bool cond_j = ij_2gon ? (La.r == R(j)) : (La.r <= R(j));
+    if(cond_i && cond_j && (k1+k2+k3).r == R(k)){
       FA[i][j] = Fr;
       LA[i][j] = La;
       return true;
     }else
+    {
+      // std::cout << "angle fail" << std::endl;
       return false;
+
+    }
   };
 
   const int N = P.rows();
@@ -487,8 +502,24 @@ bool Shor_van_wyck_v2(
   bool succ = (nP.rows()==0) || weakly_self_overlapping(nP,nR,nF);
   if(!succ){
     std::cout<<"shor failed"<<std::endl;
-    exit(0);
+    // exit(0);
     return false;
+  }else{
+    // verification
+    Eigen::VectorXi R_verify;
+    set_rotation_index(nP, nF, R_verify);
+    bool verify_succ = true;
+    for(int i = 0;  i < R_verify.rows(); i++){
+      // if(R_verify(i) != 0 or R(i) != 0)
+      if(R_verify(i) != nR(i)){
+        std::cout<<i<<":"<<R_verify(i)<<" --- "<< nR(i)<<std::endl;
+        verify_succ = false;
+      }
+    }
+    if(!verify_succ){
+      std::cout<<"shor failed in verification"<<std::endl;
+      return false;
+    }
   }
   // [map simplified index to initial polygon]
   for(int i=0;i<nF.rows();i++){
@@ -503,13 +534,11 @@ bool Shor_van_wyck_v2(
   add_colinear(P,nF,B,F);
   if(!do_refine){
     V = P;
-    Fn = nF;
-    // remap Fn vertex id to P
-    for(int i = 0; i < Fn.rows(); i++){
-      for(int k = 0; k < 3; k++){
-        Fn(i,k) = B(Fn(i,k));
-      }
-    }
+    Fn = F;
+    Eigen::VectorXi bd;
+    igl::boundary_loop(Fn, bd);
+    std::cout<<"#P size: "<<V.rows()<<std::endl;
+    std::cout<<"#bd: "<<bd.rows()<<std::endl;
     return true;
   }
   V = P;
