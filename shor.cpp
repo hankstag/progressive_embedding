@@ -3,22 +3,46 @@
 #include <igl/boundary_loop.h>
 #include <igl/adjacency_list.h>
 
-#include <igl/copyleft/cgal/orient2D.h>
 #include <igl/predicates/ear_clipping.h>
 #include "is_simple_polygon.h"
 #include <iostream>
+#include <unsupported/Eigen/MPRealSupport>
 
 using namespace std;
 
-short orientation(const Eigen::Matrix<double,3,2>& P){
-    double a[2] = {P(0, 0), P(0, 1)};
-    double b[2] = {P(1, 0), P(1, 1)};
-    double c[2] = {P(2, 0), P(2, 1)};
-    return igl::copyleft::cgal::orient2D(a, b, c);
+template <typename Scalar>
+short orientation(const Eigen::Matrix<Scalar, 3, 2>& P){
+    using mpfr::mpreal;
+    mpreal::set_default_prec(mpfr::digits2bits(200));
+    Eigen::Matrix<Scalar, 1, 2> a = P.row(0);
+    Eigen::Matrix<Scalar, 1, 2> b = P.row(1);
+    Eigen::Matrix<Scalar, 1, 2> c = P.row(2);
+    if(std::is_same<Scalar, mpreal>::value){
+      // increase the precision by 2
+      Scalar signed_area = a[0]*b[1] - b[0]*a[1] + \
+                           b[0]*c[1] - c[0]*b[1] + \
+                           c[0]*a[1] - a[0]*c[1];
+      if(signed_area < 0.0){
+        mpreal::set_default_prec(mpfr::digits2bits(100));
+        return -1;
+      }else if(signed_area == 0.0){
+        mpreal::set_default_prec(mpfr::digits2bits(100));
+        return 0;
+      }else{
+        mpreal::set_default_prec(mpfr::digits2bits(100));
+        return 1;
+      }
+    }else{
+      Eigen::Matrix<double, 1, 2> a_db(P(0, 0), P(0, 1));
+      Eigen::Matrix<double, 1, 2> b_db(P(1, 0), P(1, 1));
+      Eigen::Matrix<double, 1, 2> c_db(P(2, 0), P(2, 1));
+      return short(igl::predicates::orient2d(a_db, b_db, c_db));
+    }
 }
 
+template <typename Scalar>
 void set_rotation_index(
-   const Eigen::MatrixXd& uv,
+   const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& uv,
    const Eigen::MatrixXi& F,
    Eigen::VectorXi& R,
    int offset
@@ -32,16 +56,51 @@ void set_rotation_index(
    // for every boundary vertex, update its rotation index
    for(int i=0;i<bd.rows();i++){
        int v = bd((i+offset)%bd.rows());
-       Angle sum = Angle();
+       Angle<Scalar> sum = Angle<Scalar>();
        std::reverse(A[v].begin(),A[v].end());
        for(int j=0;j<A[v].size()-1;j++){
            int id = A[v][j];
            int id_1 = A[v][j+1];
-           Angle I(uv.row(id),uv.row(v),uv.row(id_1)); // w1, v, w2
+           Angle<Scalar> I(uv.row(id),uv.row(v),uv.row(id_1)); // w1, v, w2
            sum = (j==0)? I: sum+I;
        }
        R(i) = sum.r;
    }
+}
+
+template <typename Scalar>
+Eigen::VectorXi set_all_ri(
+    const Eigen::Matrix<Scalar, -1, -1> & uv,
+    const Eigen::MatrixXi& F
+){
+    std::vector<std::vector<int>> A;
+    igl::adjacency_list(F, A, true);
+
+    int offset = 0;
+    std::vector<std::vector<int>> bds;
+    igl::boundary_loop(F, bds);
+
+    Eigen::VectorXi R;
+    R.setZero(uv.rows());
+
+    for(auto bd: bds){
+      std::cout<<"boundary lengths: "<<bd.size()<<std::endl;
+      // for every boundary vertex, update its rotation index
+      for(int i=0;i<bd.size();i++){
+          int v = bd[(i+offset)%bd.size()];
+          Angle<Scalar> sum = Angle<Scalar>();
+          std::reverse(A[v].begin(),A[v].end());
+          for(int j=0;j<A[v].size()-1;j++){
+              int id = A[v][j];
+              int id_1 = A[v][j+1];
+              Angle<Scalar> I(uv.row(id),uv.row(v),uv.row(id_1)); // w1, v, w2
+              sum = (j==0)? I: sum+I;
+          }
+          R(v) = sum.r;
+      }
+
+    }
+    return R;
 }
 
 void add_triangle(
@@ -58,74 +117,71 @@ void add_triangle(
   add_triangle(F,k,j,K,Q);
 }
 
+template <typename Scalar>
+bool add_to_table(
+  const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& P,
+  const Eigen::VectorXi& R,
+  std::vector<std::vector<Angle<Scalar>>>& FA,
+  std::vector<std::vector<Angle<Scalar>>>& LA,
+  int i, int k, int j
+){
+  const int N = P.rows();
+  Eigen::Matrix<Scalar, 1, 2> pi = P.row(i);
+  Eigen::Matrix<Scalar, 1, 2> pk = P.row(k);
+  Eigen::Matrix<Scalar, 1, 2> pj = P.row(j);
+  
+  Eigen::Matrix<Scalar, 3, 2> T;
+  T << pi, pk, pj;
+  if(orientation(T) != 1)
+    return false;
+  
+  Angle<Scalar> I(pj,pi,pk); // J I K
+  Angle<Scalar> J(pk,pj,pi); // K J I
+  
+  Angle<Scalar> k1 = LA[i][k];
+  Angle<Scalar> k2(P.row(i),P.row(k),P.row(j));
+  Angle<Scalar> k3 = FA[k][j];
+  Angle<Scalar> Fr = I + FA[i][k];
+  Angle<Scalar> La = LA[k][j] + J;
+  bool ij_2gon = (j+1) % P.rows() == i; // whether Pji is 2gon
+  bool cond_i = ij_2gon ? (Fr.r == R(i)) : (Fr.r <= R(i));
+  bool cond_j = ij_2gon ? (La.r == R(j)) : (La.r <= R(j));
+  if(cond_i && cond_j && (k1+k2+k3).r == R(k)){
+    FA[i][j] = Fr;
+    LA[i][j] = La;
+    return true;
+  }else{
+    return false;
+  }
+}
+
+template <typename Scalar>
 bool weakly_self_overlapping(
-  const Eigen::MatrixXd& P,
+  const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& P,
   const Eigen::VectorXi& R,
   Eigen::MatrixXi& F
 ){
   std::cout<<"weakly self overlapping test"<<std::endl;
-  auto add_to_table = [](
-    const Eigen::MatrixXd& P,
-    const Eigen::VectorXi& R,
-    std::vector<std::vector<Angle>>& FA,
-    std::vector<std::vector<Angle>>& LA,
-    int i, int k, int j
-  ){
-    const int N = P.rows();
-    Eigen::RowVector2d pi = P.row(i);
-    Eigen::RowVector2d pk = P.row(k);
-    Eigen::RowVector2d pj = P.row(j);
-    auto r = igl::predicates::orient2d(pi,pk,pj);
-    if(r == igl::predicates::Orientation::COLLINEAR ||
-       r == igl::predicates::Orientation::NEGATIVE)
-       {
-        //  std::cout << "orientation fail" << std::endl;
-         return false;
-
-       }
-    
-    Angle I(pj,pi,pk); // J I K
-    Angle J(pk,pj,pi); // K J I
-    
-    Angle k1 = LA[i][k];
-    Angle k2(P.row(i),P.row(k),P.row(j));
-    Angle k3 = FA[k][j];
-    Angle Fr = I + FA[i][k];
-    Angle La = LA[k][j] + J;
-    bool ij_2gon = (j+1)%P.rows()==i; // whether Pji is 2gon
-    bool cond_i = ij_2gon ? (Fr.r == R(i)) : (Fr.r <= R(i));
-    bool cond_j = ij_2gon ? (La.r == R(j)) : (La.r <= R(j));
-    if(cond_i && cond_j && (k1+k2+k3).r == R(k)){
-      FA[i][j] = Fr;
-      LA[i][j] = La;
-      return true;
-    }else
-    {
-      // std::cout << "angle fail" << std::endl;
-      return false;
-
-    }
-  };
 
   const int N = P.rows();
   std::vector<std::vector<int>> K(N, std::vector<int>(N,-1));
   std::vector<std::vector<int>> Q(N, std::vector<int>(N,0));
-  std::vector<std::vector<Angle>> FA(N, std::vector<Angle>(N));
-  std::vector<std::vector<Angle>> LA(N, std::vector<Angle>(N));
+  std::vector<std::vector<Angle<Scalar>>> FA(N, std::vector<Angle<Scalar>>(N));
+  std::vector<std::vector<Angle<Scalar>>> LA(N, std::vector<Angle<Scalar>>(N));
   bool succ = false;
   int i;
   for(int i=0;i<N;i++){
     Q[i][(i+1)%N]=1;
-    FA[i][(i+1)%N] = Angle(P.row((i+1)%N),P.row(i),P.row((i+1)%N));
-    LA[i][(i+1)%N] = Angle(P.row(i),P.row((i+1)%N),P.row(i));
+    FA[i][(i+1)%N] = Angle<Scalar>(P.row((i+1)%N),P.row(i),P.row((i+1)%N));
+    LA[i][(i+1)%N] = Angle<Scalar>(P.row(i),P.row((i+1)%N),P.row(i));
   }
     int h = -1;
-    std::vector<std::vector<double>> A(N, std::vector<double>(N,-1));
+    std::vector<std::vector<Scalar>> A(N, std::vector<Scalar>(N,-1));
   for(int d=2;d<N && !succ;d++){
     for(i=0;i<N && !succ;i++){
       int j = (i + d)%N;
       int k = (i + 1)%N;
-      double min_q = -1.0f;
+      Scalar min_q = -1.0f;
       while (k!=j){
         if (Q[i][k]==1 && Q[k][j]==1){
           if(add_to_table(P,R,FA,LA,i,k,j)){
@@ -174,12 +230,13 @@ void drop_colinear(
   igl::slice(R,B,mR);
 }
 
+template <typename Scalar>
 void drop_colinear_v2(
-  const Eigen::MatrixXd& P,
+  const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& P,
   const Eigen::VectorXi& R,
   const Eigen::VectorXi& mark,
   Eigen::VectorXi& B,
-  Eigen::MatrixXd& mP,
+  Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& mP,
   Eigen::VectorXi& mR
 ){
   int dropped = 0;
@@ -191,8 +248,6 @@ void drop_colinear_v2(
     int a = (i-1+N)%N;
     int v = i;
     int b = (i+1)%N;
-    Eigen::Matrix<double,3,2> T;
-    T<<P.row(a),P.row(v),P.row(b);
     if(R(v)!=0 || mark(v)!=0){ // non-colinear or rotate index nonzero
       Bv.push_back(v);
     }else
@@ -203,8 +258,9 @@ void drop_colinear_v2(
   igl::slice(R,B,mR);
 }
 
+template <typename Scalar>
 void add_colinear(
-  const Eigen::MatrixXd& P,
+  const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& P,
   const Eigen::MatrixXi& nF,
   const Eigen::VectorXi& B,
   Eigen::MatrixXi& F
@@ -471,12 +527,13 @@ bool Shor_van_wyck(
 }
 
 // the re-implementation of Shor algorithm
+template <typename Scalar>
 bool Shor_van_wyck_v2(
-  const Eigen::MatrixXd& P,
+  const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& P,
   const Eigen::VectorXi& R,
   const Eigen::VectorXi& mark,
   const std::string flags,
-  Eigen::MatrixXd& V,
+  Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& V,
   Eigen::MatrixXi& F,
   Eigen::MatrixXi& Fn,
   bool do_refine
@@ -484,7 +541,7 @@ bool Shor_van_wyck_v2(
 
   // [drop colinear points]
   Eigen::VectorXi B; // remaining vertices: non-colinear/rotateindex!=0
-  Eigen::MatrixXd mP; // P \ colinear vertices
+  Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> mP; // P \ colinear vertices
   Eigen::VectorXi mR;
   drop_colinear_v2(P,R,mark,B,mP,mR);
   std::cout<<"after removing colinear #P: "<<mP.rows()<<std::endl;
@@ -492,10 +549,13 @@ bool Shor_van_wyck_v2(
   // [ear clipping]
   Eigen::VectorXi D;
   Eigen::MatrixXi eF;
-  Eigen::MatrixXd nP;
+  Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> nP;
   Eigen::VectorXi nR;
-  igl::predicates::ear_clipping(mP,mR,D,eF,nP);
-  igl::slice(mR,D,1,nR);
+  // igl::predicates::ear_clipping(mP,mR,D,eF,nP);
+  // igl::slice(mR,D,1,nR);
+  nP = mP;
+  nR = mR;
+  D = igl::LinSpaced<Eigen::VectorXi>(nP.rows(), 0, nP.rows()-1);
 
   // [weakly-self-overlapping test]
   Eigen::MatrixXi nF;
@@ -522,33 +582,59 @@ bool Shor_van_wyck_v2(
     }
   }
   // [map simplified index to initial polygon]
-  for(int i=0;i<nF.rows();i++){
-    nF.row(i) << D(nF(i,0)),D(nF(i,1)),D(nF(i,2));
-  }
+  // for(int i=0;i<nF.rows();i++){
+  //   nF.row(i) << D(nF(i,0)),D(nF(i,1)),D(nF(i,2));
+  // }
+  
   if(eF.rows()>0){
     nF.conservativeResize(nF.rows()+eF.rows(),3);
     nF.block(nF.rows()-eF.rows(),0,eF.rows(),3) = eF;
   }
 
   // [add back colinear vertices by spliting boundary edges]
+  std::cout<<"add back vertices\n";
   add_colinear(P,nF,B,F);
-  if(!do_refine){
-    V = P;
-    Fn = F;
-    Eigen::VectorXi bd;
-    igl::boundary_loop(Fn, bd);
-    std::cout<<"#P size: "<<V.rows()<<std::endl;
-    std::cout<<"#bd: "<<bd.rows()<<std::endl;
-    return true;
-  }
+  
   V = P;
-
-  // [simplify mesh (subdivide into small polygons)]
-  std::vector<std::vector<int>> L;
-  subdivide_polygon(V,F,L);
-
-  // [refine each small polygon]
-  Eigen::MatrixXd V0 = V;
-  simplify_triangulation(V0,L,V,F);
+  Fn = F;
+  Eigen::VectorXi bd;
+  igl::boundary_loop(Fn, bd);
+  std::cout<<"#P size: "<<V.rows()<<std::endl;
+  std::cout<<"#bd: "<<bd.rows()<<std::endl;
+  
   return true;
+
 }
+
+template bool add_to_table<mpfr::mpreal>(
+  const Eigen::Matrix<mpfr::mpreal, Eigen::Dynamic, Eigen::Dynamic>&,
+  const Eigen::VectorXi& ,
+  std::vector<std::vector<Angle<mpfr::mpreal>>>&,
+  std::vector<std::vector<Angle<mpfr::mpreal>>>&,
+  int i, int k, int j
+);
+template bool add_to_table<double>(
+  const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>&,
+  const Eigen::VectorXi& ,
+  std::vector<std::vector<Angle<double>>>&,
+  std::vector<std::vector<Angle<double>>>&,
+  int i, int k, int j
+);
+
+template Eigen::VectorXi set_all_ri<mpfr::mpreal>(
+    const Eigen::Matrix<mpfr::mpreal, -1, -1> &,
+    const Eigen::MatrixXi& F
+);
+template Eigen::VectorXi set_all_ri<double>(
+    const Eigen::Matrix<double, -1, -1> &,
+    const Eigen::MatrixXi& F
+);
+template short orientation<mpfr::mpreal>(const Eigen::Matrix<mpfr::mpreal, 3, 2>& P);
+template short orientation<double>(const Eigen::Matrix<double, 3, 2>& P);
+template void drop_colinear_v2<mpfr::mpreal>(const Eigen::Matrix<mpfr::mpreal, Eigen::Dynamic, Eigen::Dynamic>&, const Eigen::Matrix<int, -1, 1>&, const Eigen::Matrix<int, -1, 1>&, Eigen::Matrix<int, -1, 1>&, Eigen::Matrix<mpfr::mpreal, Eigen::Dynamic, Eigen::Dynamic>&, Eigen::Matrix<int, -1, 1>&);
+template void drop_colinear_v2<double>(const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>&,const Eigen::Matrix<int, -1, 1>&, const Eigen::Matrix<int, -1, 1>&,Eigen::Matrix<int, -1, 1>&,Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>&,Eigen::Matrix<int, -1, 1>&);
+template void add_colinear<double>(const Eigen::Matrix<double, -1, -1>&, const Eigen::Matrix<int, -1, -1>& nF, const Eigen::Matrix<int, -1, 1>& B, Eigen::Matrix<int, -1, -1>& F);
+template void set_rotation_index<double>(const Eigen::Matrix<double, -1, -1>&, const Eigen::Matrix<int, -1, -1>&, Eigen::Matrix<int, -1, 1>&, int);
+template void set_rotation_index<mpfr::mpreal>(const Eigen::Matrix<mpfr::mpreal, -1, -1>&, const Eigen::Matrix<int, -1, -1>&, Eigen::Matrix<int, -1, 1>&, int);
+template bool Shor_van_wyck_v2<double>(const Eigen::Matrix<double, -1, -1>&, const Eigen::Matrix<int, -1, 1>&, const Eigen::Matrix<int, -1, 1>&, const std::string, Eigen::Matrix<double, -1, -1>&, Eigen::Matrix<int, -1, -1>&, Eigen::Matrix<int, -1, -1>&, bool);
+template bool Shor_van_wyck_v2<mpfr::mpreal>(const Eigen::Matrix<mpfr::mpreal, -1, -1>&, const Eigen::Matrix<int, -1, 1>&, const Eigen::Matrix<int, -1, 1>&, const std::string, Eigen::Matrix<mpfr::mpreal, -1, -1>&, Eigen::Matrix<int, -1, -1>&, Eigen::Matrix<int, -1, -1>&, bool);

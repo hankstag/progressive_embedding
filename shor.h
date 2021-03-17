@@ -7,21 +7,24 @@
 #include <igl/slice.h>
 #include <igl/list_to_matrix.h>
 
-short orientation(const Eigen::Matrix<double,3,2>& P);
+template <typename Scalar>
+short orientation(const Eigen::Matrix<Scalar,3,2>& P);
+
+template <typename Scalar>
 struct Angle
 {
-  Eigen::RowVector2d w1,v,w2;
+  Eigen::Matrix<Scalar, 1, 2> w1,v,w2;
   int r;
   Angle(){r=0;}
-  Angle(const Eigen::RowVector2d& x,
-        const Eigen::RowVector2d& y,
-        const Eigen::RowVector2d& z): w1(x),v(y),w2(z),r(0){}
+  Angle(const Eigen::Matrix<Scalar, 1, 2>& x,
+        const Eigen::Matrix<Scalar, 1, 2>& y,
+        const Eigen::Matrix<Scalar, 1, 2>& z): w1(x),v(y),w2(z),r(0){}
   Angle operator+(Angle K){
     assert(K.w1 == w2);
     auto w3 = K.w2;
-    Angle S(w1,v,w3);
+    Angle<Scalar> S(w1,v,w3);
 
-    Eigen::Matrix<double,3,2> tri1,tri2,tri3;
+    Eigen::Matrix<Scalar,3,2> tri1,tri2,tri3;
     tri1<<w1,v,w2;  //w1,v,w2
     tri2<<w2,v,w3;  //w2,v,w3
     tri3<<w1,v,w3;  //w1,v,w3
@@ -35,9 +38,9 @@ struct Angle
     bool is_zero_2 = false;
     if(ori1 == 0) // w1,v,w2 are collinear
     {
-      Eigen::Matrix<double,3,2> T1;
-      Eigen::Matrix<double,3,2> T2;
-      Eigen::RowVector2d ref;
+      Eigen::Matrix<Scalar,3,2> T1;
+      Eigen::Matrix<Scalar,3,2> T2;
+      Eigen::Matrix<Scalar,1,2> ref;
       ref<<0,0;
       T1<<ref,v,w1;
       if(orientation(T1) == 0){
@@ -56,9 +59,9 @@ struct Angle
     }
     if(ori2 == 0) // w3,v,w2 are collinear
     {
-      Eigen::Matrix<double,3,2> T1;
-      Eigen::Matrix<double,3,2> T2;
-      Eigen::RowVector2d ref;
+      Eigen::Matrix<Scalar,3,2> T1;
+      Eigen::Matrix<Scalar,3,2> T2;
+      Eigen::Matrix<Scalar,1,2> ref;
       ref<<0,0;
       T1<<ref,v,w3;
       if(orientation(T1) == 0){
@@ -95,8 +98,9 @@ void simplify_triangulation(
 
 
 // test for weakly-self-overlapping
+template <typename Scalar>
 bool weakly_self_overlapping(
-  const Eigen::MatrixXd& P,
+  const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& P,
   const Eigen::VectorXi& R,
   Eigen::MatrixXi& F
 );
@@ -115,25 +119,18 @@ void drop_colinear(
   Eigen::VectorXi& mR
 );
 
-void add_colinear(
-  const Eigen::MatrixXd& P,
-  const Eigen::MatrixXi& nF,
-  const Eigen::VectorXi& B,
-  Eigen::MatrixXi& F
-);
-
-void add_triangle(
-  Eigen::MatrixXi& F, 
-  int i, int j, 
-  std::vector<std::vector<int>>& K,
-  std::vector<std::vector<int>>& Q
-);
-
+template <typename Scalar>
 void set_rotation_index(
-  const Eigen::MatrixXd& uv,
-  const Eigen::MatrixXi& F, 
-  Eigen::VectorXi& R,
-  int offset=0
+   const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& uv,
+   const Eigen::MatrixXi& F,
+   Eigen::VectorXi& R,
+   int offset = 0
+);
+
+template <typename Scalar>
+Eigen::VectorXi set_all_ri(
+    const Eigen::Matrix<Scalar, -1, -1> & uv,
+    const Eigen::MatrixXi& F
 );
 
 bool Shor_van_wyck(
@@ -145,12 +142,13 @@ bool Shor_van_wyck(
   bool do_refine=true // false meaning no internal vertices
 );
 
+template <typename Scalar>
 bool Shor_van_wyck_v2(
-  const Eigen::MatrixXd& P,
+  const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& P,
   const Eigen::VectorXi& R,
   const Eigen::VectorXi& mark,
   const std::string flags,
-  Eigen::MatrixXd& V,
+  Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& V,
   Eigen::MatrixXi& F,
   Eigen::MatrixXi& Fn,
   bool do_refine
