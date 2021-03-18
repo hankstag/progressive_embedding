@@ -19,9 +19,19 @@ short orientation(const Eigen::Matrix<Scalar, 3, 2>& P){
     Eigen::Matrix<Scalar, 1, 2> c = P.row(2);
     if(std::is_same<Scalar, mpreal>::value){
       // increase the precision by 2
-      Scalar signed_area = a[0]*b[1] - b[0]*a[1] + \
-                           b[0]*c[1] - c[0]*b[1] + \
-                           c[0]*a[1] - a[0]*c[1];
+      mpfr::mpreal a0 = Scalar(a[0]);
+      mpfr::mpreal a1 = Scalar(a[1]);
+      mpfr::mpreal b0 = Scalar(b[0]);
+      mpfr::mpreal b1 = Scalar(b[1]);
+      mpfr::mpreal c0 = Scalar(c[0]);
+      mpfr::mpreal c1 = Scalar(c[1]);
+      a0.setPrecision(1000); a1.setPrecision(1000);
+      b0.setPrecision(1000); b1.setPrecision(1000);
+      c0.setPrecision(1000); c1.setPrecision(1000);
+      mpfr::mpreal signed_area = a0*b1 - b0*a1 + \
+                                 b0*c1 - c0*b1 + \
+                                 c0*a1 - a0*c1;
+      mpfr::mpreal x = a0;
       if(signed_area < 0.0){
         mpreal::set_default_prec(mpfr::digits2bits(100));
         return -1;
@@ -545,6 +555,8 @@ bool Shor_van_wyck_v2(
   Eigen::VectorXi mR;
   drop_colinear_v2(P,R,mark,B,mP,mR);
   std::cout<<"after removing colinear #P: "<<mP.rows()<<std::endl;
+  std::cout<<"mP:\n";
+  std::cout<<std::setprecision(17)<<mP<<std::endl;
 
   // [ear clipping]
   Eigen::VectorXi D;
