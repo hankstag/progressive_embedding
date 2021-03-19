@@ -127,6 +127,30 @@ void add_triangle(
   add_triangle(F,k,j,K,Q);
 }
 
+void inspect_table(
+  std::vector<std::vector<int>>& K,
+  std::vector<std::vector<int>>& Q
+){
+
+  // find the max distance between (j < i) for every i
+  int max_size = 0;
+  std::pair<int,int> max_ij;
+  int N = K.size();
+  for(int i = 0; i < N; i++){
+    for(int j = (i-1+N)%N; j != i; j = (j-1+N)%N){
+      if(Q[i][j] == 1){
+        int p_size = i > j ? (N+1-i+j) : (j-i+1);
+        if(max_size < p_size){
+          max_ij = std::make_pair(i, j);
+          max_size = p_size;
+        }
+      }
+    }
+  }
+  std::cout << "max polygon size: " << max_size << "/" << N << std::endl;
+  std::cout << "range = [" << max_ij.first << "," << max_ij.second << "]" <<std::endl;
+}
+
 template <typename Scalar>
 bool add_to_table(
   const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& P,
@@ -208,7 +232,8 @@ bool weakly_self_overlapping(
       }
     }
   }
-  std::cout<<"test done"<<std::endl; 
+  std::cout<<"test done, h = "<<h<<std::endl; 
+  inspect_table(K, Q);
   if(h == -1) return false;
   add_triangle(F,h,(h-1+N)%N,K,Q);
   return true;
@@ -571,6 +596,11 @@ bool Shor_van_wyck_v2(
 
   // [weakly-self-overlapping test]
   Eigen::MatrixXi nF;
+  for(int i = 0; i < nR.rows(); i++){
+    if(nR(i) != 0){
+      std::cout << "RI("<<i<<") = " << nR(i) << std::endl;
+    }
+  }
   bool succ = (nP.rows()==0) || weakly_self_overlapping(nP,nR,nF);
   if(!succ){
     std::cout<<"shor failed"<<std::endl;
