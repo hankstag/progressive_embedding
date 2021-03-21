@@ -1,5 +1,5 @@
-#ifndef SHOR_H
-#define SHOR_H
+#ifndef SHOR2_H
+#define SHOR2_H
 #include "embed_points.h"
 #include <Eigen/Core>
 #include <iostream>
@@ -89,6 +89,11 @@ struct Angle
   };
 };
 
+Eigen::VectorXi set_ri(
+    const Eigen::MatrixXd& uv,
+    const Eigen::MatrixXi& F
+);
+
 void simplify_triangulation(
   const Eigen::MatrixXd& V_i,
   const Eigen::MatrixXd& C,
@@ -101,6 +106,13 @@ void simplify_triangulation(
 template <typename Scalar>
 bool weakly_self_overlapping(
   const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& P,
+  const Eigen::VectorXi& R,
+  Eigen::MatrixXi& F
+);
+
+// wrapper for weakly selfoverlappnig test - passing mpf as string
+bool weakly_self_overlapping_str(
+  const std::vector<std::vector<std::string>>& P_str,
   const Eigen::VectorXi& R,
   Eigen::MatrixXi& F
 );

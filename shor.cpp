@@ -10,43 +10,46 @@
 
 using namespace std;
 
+short orientation_flt(const Eigen::Matrix<double, 3, 2>& P){
+  Eigen::Matrix<double, 1, 2> a_db(P(0, 0), P(0, 1));
+  Eigen::Matrix<double, 1, 2> b_db(P(1, 0), P(1, 1));
+  Eigen::Matrix<double, 1, 2> c_db(P(2, 0), P(2, 1));
+  return short(igl::predicates::orient2d(a_db, b_db, c_db));
+}
+
+short orientation_mpf(const Eigen::Matrix<mpfr::mpreal, 3, 2>& P){
+  using mpfr::mpreal;
+  mpfr_prec_t n_bits = mpreal::get_default_prec();
+  mpreal::set_default_prec(n_bits*4);
+  mpreal a0, a1, b0, b1, c0, c1;
+  a0 = P(0,0); a1 = P(0,1); b0 = P(1,0); b1 = P(1, 1); c0 = P(2, 0); c1 = P(2, 1);
+  a0.set_prec(n_bits*4); a1.set_prec(n_bits*4); 
+  b0.set_prec(n_bits*4); b1.set_prec(n_bits*4);
+  c0.set_prec(n_bits*4); c1.set_prec(n_bits*4);
+  mpreal signed_area = a0*b1 - b0*a1 + \
+                       b0*c1 - c0*b1 + \
+                       c0*a1 - a0*c1;
+  short code = -9999;
+  if(signed_area < 0.0){
+    code = -1;
+  }else if(signed_area == 0.0){
+    code = 0;
+  }else{
+    code = 1;
+  }
+  mpreal::set_default_prec(n_bits);
+  assert(code != -1);
+  return code;
+}
+
 template <typename Scalar>
 short orientation(const Eigen::Matrix<Scalar, 3, 2>& P){
-    using mpfr::mpreal;
-    mpreal::set_default_prec(mpfr::digits2bits(200));
-    Eigen::Matrix<Scalar, 1, 2> a = P.row(0);
-    Eigen::Matrix<Scalar, 1, 2> b = P.row(1);
-    Eigen::Matrix<Scalar, 1, 2> c = P.row(2);
-    if(std::is_same<Scalar, mpreal>::value){
-      // increase the precision by 2
-      mpfr::mpreal a0 = Scalar(a[0]);
-      mpfr::mpreal a1 = Scalar(a[1]);
-      mpfr::mpreal b0 = Scalar(b[0]);
-      mpfr::mpreal b1 = Scalar(b[1]);
-      mpfr::mpreal c0 = Scalar(c[0]);
-      mpfr::mpreal c1 = Scalar(c[1]);
-      a0.setPrecision(1000); a1.setPrecision(1000);
-      b0.setPrecision(1000); b1.setPrecision(1000);
-      c0.setPrecision(1000); c1.setPrecision(1000);
-      mpfr::mpreal signed_area = a0*b1 - b0*a1 + \
-                                 b0*c1 - c0*b1 + \
-                                 c0*a1 - a0*c1;
-      mpfr::mpreal x = a0;
-      if(signed_area < 0.0){
-        mpreal::set_default_prec(mpfr::digits2bits(100));
-        return -1;
-      }else if(signed_area == 0.0){
-        mpreal::set_default_prec(mpfr::digits2bits(100));
-        return 0;
-      }else{
-        mpreal::set_default_prec(mpfr::digits2bits(100));
-        return 1;
-      }
+    if(std::is_same<Scalar, mpfr::mpreal>::value){
+      Eigen::Matrix<mpfr::mpreal, 3, 2> P_mpf = P.template cast <mpfr::mpreal> ();
+      return orientation_mpf(P_mpf);
     }else{
-      Eigen::Matrix<double, 1, 2> a_db(P(0, 0), P(0, 1));
-      Eigen::Matrix<double, 1, 2> b_db(P(1, 0), P(1, 1));
-      Eigen::Matrix<double, 1, 2> c_db(P(2, 0), P(2, 1));
-      return short(igl::predicates::orient2d(a_db, b_db, c_db));
+      Eigen::Matrix<double, 3, 2> P_flt = P.template cast <double>();
+      return orientation_flt(P_flt);
     }
 }
 
@@ -76,6 +79,36 @@ void set_rotation_index(
        }
        R(i) = sum.r;
    }
+}
+
+Eigen::VectorXi set_ri(
+    const Eigen::MatrixXd& uv,
+    const Eigen::MatrixXi& F
+){
+    // std::cout<<F<<std::endl;
+    int offset = 0;
+    Eigen::VectorXi R;
+    Eigen::VectorXi bd;
+    igl::boundary_loop(F,bd);
+    R.setZero(bd.rows());
+    std::cout<<"boundary lengths: "<<bd.rows()<<std::endl;
+    std::vector<std::vector<int>> A;
+    igl::adjacency_list(F,A,true);
+
+    // for every boundary vertex, update its rotation index
+    for(int i=0;i<bd.rows();i++){
+        int v = bd((i+offset)%bd.rows());
+        Angle<double> sum = Angle<double>();
+        std::reverse(A[v].begin(),A[v].end());
+        for(int j=0;j<A[v].size()-1;j++){
+            int id = A[v][j];
+            int id_1 = A[v][j+1];
+            Angle<double> I(uv.row(id),uv.row(v),uv.row(id_1)); // w1, v, w2
+            sum = (j==0)? I: sum+I;
+        }
+        R(i) = sum.r;
+    }
+    return R;
 }
 
 template <typename Scalar>
@@ -189,6 +222,25 @@ bool add_to_table(
   }
 }
 
+bool weakly_self_overlapping_str(
+  const std::vector<std::vector<std::string>>& P_str,
+  const Eigen::VectorXi& R,
+  Eigen::MatrixXi& F
+){
+  using mpfr::mpreal;
+  int dps = P_str[0][0].size()-2;
+  std::cout<<"dps inside wso check: "<<dps<<std::endl;
+  mpreal::set_default_prec(mpfr::digits2bits(dps));
+  Eigen::Matrix<mpreal, Eigen::Dynamic, Eigen::Dynamic> P(P_str.size(), 2);
+  std::cout<<"actual prec: " << P(0,0).get_prec() << std::endl;
+  for(int i = 0; i < P_str.size(); i++){
+    for(int k = 0; k < 2; k++){
+      P(i,k) = mpreal(P_str[i][k]);
+    }
+  }
+  return weakly_self_overlapping(P, R, F);
+}
+
 template <typename Scalar>
 bool weakly_self_overlapping(
   const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& P,
@@ -277,8 +329,6 @@ void drop_colinear_v2(
   int dropped = 0;
   int N = P.rows();
   std::vector<int> Bv;
-  std::cout<<"mark size: "<<mark.rows()<<std::endl;
-  std::cout<<"N: "<<N<<std::endl;
   for(int i=0;i<N;i++){
     int a = (i-1+N)%N;
     int v = i;
@@ -580,8 +630,6 @@ bool Shor_van_wyck_v2(
   Eigen::VectorXi mR;
   drop_colinear_v2(P,R,mark,B,mP,mR);
   std::cout<<"after removing colinear #P: "<<mP.rows()<<std::endl;
-  std::cout<<"mP:\n";
-  std::cout<<std::setprecision(17)<<mP<<std::endl;
 
   // [ear clipping]
   Eigen::VectorXi D;
@@ -596,15 +644,9 @@ bool Shor_van_wyck_v2(
 
   // [weakly-self-overlapping test]
   Eigen::MatrixXi nF;
-  for(int i = 0; i < nR.rows(); i++){
-    if(nR(i) != 0){
-      std::cout << "RI("<<i<<") = " << nR(i) << std::endl;
-    }
-  }
   bool succ = (nP.rows()==0) || weakly_self_overlapping(nP,nR,nF);
   if(!succ){
     std::cout<<"shor failed"<<std::endl;
-    // exit(0);
     return false;
   }else{
     // verification
@@ -612,9 +654,8 @@ bool Shor_van_wyck_v2(
     set_rotation_index(nP, nF, R_verify);
     bool verify_succ = true;
     for(int i = 0;  i < R_verify.rows(); i++){
-      // if(R_verify(i) != 0 or R(i) != 0)
       if(R_verify(i) != nR(i)){
-        std::cout<<i<<":"<<R_verify(i)<<" --- "<< nR(i)<<std::endl;
+        // std::cout<<i<<":"<<R_verify(i)<<" --- "<< nR(i)<<std::endl;
         verify_succ = false;
       }
     }
