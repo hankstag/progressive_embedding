@@ -38,7 +38,7 @@ short orientation_mpf(const Eigen::Matrix<mpfr::mpreal, 3, 2>& P){
     code = 1;
   }
   mpreal::set_default_prec(n_bits);
-  assert(code != -1);
+  assert(code != -9999);
   return code;
 }
 
