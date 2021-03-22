@@ -2,8 +2,7 @@
 #include "plot.h"
 #include <igl/boundary_loop.h>
 #include <igl/adjacency_list.h>
-
-#include <igl/predicates/ear_clipping.h>
+#include <igl/predicates/predicates.h>
 #include "is_simple_polygon.h"
 #include <iostream>
 #include <unsupported/Eigen/MPRealSupport>
@@ -51,6 +50,152 @@ short orientation(const Eigen::Matrix<Scalar, 3, 2>& P){
       Eigen::Matrix<double, 3, 2> P_flt = P.template cast <double>();
       return orientation_flt(P_flt);
     }
+}
+
+template <typename Scalar>
+bool segment_segment_intersect(
+  const Eigen::Matrix<Scalar, 1, 2>& a,
+  const Eigen::Matrix<Scalar, 1, 2>& b,
+  const Eigen::Matrix<Scalar, 1, 2>& c,
+  const Eigen::Matrix<Scalar, 1, 2>& d
+){
+  Eigen::Matrix<Scalar, 3, 2> T1, T2, T3, T4;
+  T1 << a,b,c; T2 << b,c,d; T3 << a,b,d; T4 << a,c,d;
+  
+  auto t1 = orientation(T1);
+  auto t2 = orientation(T2);
+  auto t3 = orientation(T3);
+  auto t4 = orientation(T4);
+
+  // assume m,n,p are colinear, check whether p is in range [m,n]
+  auto on_segment = [](
+    const Eigen::Matrix<Scalar, 1, 2>& m,
+    const Eigen::Matrix<Scalar, 1, 2>& n,
+    const Eigen::Matrix<Scalar, 1, 2>& p
+  ){
+      return ((p(0) >= std::min(m(0),n(0))) &&
+              (p(0) <= std::max(m(0),n(0))) &&
+              (p(1) >= std::min(m(1),n(1))) &&
+              (p(1) <= std::max(m(1),n(1))));
+  };
+  
+  // colinear case
+  if((t1 == 0 && on_segment(a,b,c)) ||
+     (t2 == 0 && on_segment(c,d,b)) ||
+     (t3 == 0 && on_segment(a,b,d)) ||
+     (t4 == 0 && on_segment(c,d,a))) 
+     return true;
+  
+  // ordinary case
+  return (t1 != t3 && t2 != t4);
+}
+
+// a wrapper for ear clipping functionalities that supports both mpf and floats
+template <typename Scalar>
+void ear_clipping(
+  const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& P,
+  const Eigen::VectorXi& RT,
+  Eigen::VectorXi& I,
+  Eigen::MatrixXi& eF,
+  Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& nP
+){
+    // check whether vertex i is an ear
+  auto is_ear = [](
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& P,
+    const Eigen::VectorXi& RT,
+    const Eigen::VectorXi& L,
+    const Eigen::VectorXi& R,
+    const int i
+  ){
+    
+    int a = L(i), b = R(i);
+    if(RT(i) != 0 || RT(a) != 0 || RT(b) != 0) return false;
+    Eigen::Matrix<Scalar,1,2> pa = P.row(a);
+    Eigen::Matrix<Scalar,1,2> pb = P.row(b);
+    Eigen::Matrix<Scalar,1,2> pi = P.row(i);
+    Eigen::Matrix<Scalar, 3, 2> T;
+    T << pa, pi, pb;
+    short r = orientation(T);
+    if(r != 1) return false;
+    
+    int k = R(b);
+    int l = R(k);
+    while(k != a){
+      Eigen::Matrix<Scalar,1,2> q = P.row(k);
+      Eigen::Matrix<Scalar,1,2> p = P.row(l);
+      if ( segment_segment_intersect(pa, pb, q, p)
+        || segment_segment_intersect(pa, pi, q, p)
+        || segment_segment_intersect(pi, pb, q, p)
+      ){
+        return false;
+      }
+      k = l;
+      l = R(k);
+    }
+
+    return true;
+  };
+
+  Eigen::VectorXi L(P.rows());
+  Eigen::VectorXi R(P.rows());
+  for(int i = 0; i < P.rows(); i++){
+    L(i) = int((i-1+P.rows())%P.rows());
+    R(i) = int((i+1)%P.rows());
+  }
+
+  Eigen::VectorXi ears; // mark ears
+  Eigen::VectorXi X; // clipped vertices
+  ears.setZero(P.rows());
+  X.setZero(P.rows());
+
+  // initialize ears
+  for(int i = 0; i < P.rows(); i++){
+    ears(i) = is_ear(P, RT, L, R, i);
+  }
+
+  // clip ears until none left
+  while(ears.maxCoeff() == 1){
+    
+    // find the first ear
+    int e = 0;
+    while(e < ears.rows() && ears(e) != 1) e++;
+    
+    // find valid neighbors
+    int a = L(e), b = R(e);
+    if(a == b) break;
+
+    // clip ear and store face
+    eF.conservativeResize(eF.rows()+1,3);
+    eF.bottomRows(1)<<a,e,b;
+    L(b) = a;
+    L(e) = -1;
+    R(a) = b;
+    R(e) = -1;
+    ears(e) = 0; // mark vertex e as non-ear
+
+    // update neighbor's ear status
+    ears(a) = is_ear(P, RT, L, R, a);
+    ears(b) = is_ear(P, RT, L, R, b);
+    X(e) = 1;
+
+    // when only one edge left
+    // mark the endpoints as clipped
+    if(L(a) == b && R(b) == a){
+      X(a) = 1;
+      X(b) = 1;
+    }
+  }
+  
+  // collect remaining vertices if theres any
+  for(int i = 0; i < X.rows(); i++)
+    X(i) = 1 - X(i);
+  I.resize(X.sum());
+  int j=0;
+  for(int i=0;i<X.rows();i++)
+    if(X(i)==1){
+      I(j++) = i;
+    }
+  igl::slice(P,I,1,nP);
 }
 
 template <typename Scalar>
@@ -573,7 +718,7 @@ bool Shor_van_wyck(
   Eigen::MatrixXi eF;
   Eigen::MatrixXd nP;
   Eigen::VectorXi nR;
-  igl::predicates::ear_clipping(mP,mR,D,eF,nP);
+  ear_clipping(mP,mR,D,eF,nP);
   igl::slice(mR,D,1,nR);
 
   // [weakly-self-overlapping test]
@@ -636,11 +781,9 @@ bool Shor_van_wyck_v2(
   Eigen::MatrixXi eF;
   Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> nP;
   Eigen::VectorXi nR;
-  // igl::predicates::ear_clipping(mP,mR,D,eF,nP);
-  // igl::slice(mR,D,1,nR);
-  nP = mP;
-  nR = mR;
-  D = igl::LinSpaced<Eigen::VectorXi>(nP.rows(), 0, nP.rows()-1);
+  ear_clipping(mP,mR,D,eF,nP);
+  igl::slice(mR,D,1,nR);
+  std::cout<<"after ear clipping #P: "<<nP.rows()<<std::endl;
 
   // [weakly-self-overlapping test]
   Eigen::MatrixXi nF;
