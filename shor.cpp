@@ -2,6 +2,7 @@
 #include "plot.h"
 #include <igl/boundary_loop.h>
 #include <igl/adjacency_list.h>
+#include <igl/triangle_triangle_adjacency.h>
 #include <igl/predicates/predicates.h>
 #include "is_simple_polygon.h"
 #include <iostream>

@@ -2,6 +2,7 @@
 #include <igl/boundary_loop.h>
 #include <igl/matrix_to_list.h>
 #include <igl/triangle_triangle_adjacency.h>
+#include <igl/vertex_triangle_adjacency.h>
 #include <iostream>
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/dijkstra.h>

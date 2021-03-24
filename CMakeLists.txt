@@ -21,6 +21,8 @@ add_library(shor_van_wyck
   plot.cpp
 )
 
+add_compile_definitions(CGAL_DISABLE_ROUNDING_MATH_CHECK)
+
 add_library(matchmaker
   edge_split.cpp path_tracing.cpp target_polygon.cpp matchmaker.cpp 
   mst.cpp decompose_polygon.cpp embed_points.cpp plot.cpp validity_check.cpp
@@ -28,37 +30,6 @@ add_library(matchmaker
 
 add_library(property
   Property.cpp
-)
-
-set(MATCHMAKER_FILES
-    main.cpp
-    edge_split.cpp
-    path_tracing.cpp
-    target_polygon.cpp
-    matchmaker.cpp
-    mst.cpp
-    decompose_polygon.cpp
-    embed_points.cpp
-    plot.cpp
-    loader.cpp
-)
-
-set(GENUSZERO_FILES
-  genus_zero_tutte.cpp
-  plot.cpp
-  loader.cpp
-)
-
-set(UNTANGLE_FILES
-  untangling.cpp
-  plot.cpp
-  loader.cpp
-)
-
-set(RANDOMINIT_FILES
-  random_init.cpp
-  plot.cpp
-  loader.cpp
 )
 
 target_link_libraries(progressive_embedding igl::core igl::triangle igl::opengl_glfw igl::cgal igl::predicates igl::opengl_glfw_imgui tbb_static)

@@ -24,7 +24,7 @@ bool edge_split(
     int u1 = F0[f0][e01];
     int u0 = F0[f1][e11];
     int v0 = F0[f0][e02];
-    int v1 = F0[f1][e12];
+    int v1 = F0[f1][e12]; 
     // pushback middle
     V0.push_back({(V0[u0][0]+V0[u1][0])/2,
                  (V0[u0][1]+V0[u1][1])/2,

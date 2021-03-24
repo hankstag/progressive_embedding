@@ -4,6 +4,10 @@
 #include "local_smooth/local_smooth.h"
 #include "local_smooth/auto_grad.hpp"
 #include <igl/boundary_loop.h>
+#include <igl/is_border_vertex.h>
+#include <igl/PI.h>
+#include <igl/doublearea.h>
+#include <igl/triangle_triangle_adjacency.h>
 #include <igl/slice.h>
 #include <igl/remove_unreferenced.h>
 #include <igl/predicates/point_inside_convex_polygon.h>

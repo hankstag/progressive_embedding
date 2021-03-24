@@ -7,6 +7,7 @@
 #include "validity_check.h"
 
 #include <igl/vertex_triangle_adjacency.h>
+#include <igl/triangle_triangle_adjacency.h>
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/boundary_loop.h>
 #include <igl/matrix_to_list.h>
