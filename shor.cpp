@@ -73,6 +73,48 @@ short orientation(const Eigen::Matrix<Scalar, 3, 2> &P)
 }
 
 template <typename Scalar>
+Scalar signed_area(const Eigen::Matrix<Scalar, 3, 2> &P)
+{
+  if (std::is_same<Scalar, mpfr::mpreal>::value)
+  {
+    using mpfr::mpreal;
+    mpfr_prec_t n_bits = mpreal::get_default_prec();
+    mpreal::set_default_prec(n_bits * 8);
+    mpreal a0, a1, b0, b1, c0, c1;
+    a0 = P(0, 0);
+    a1 = P(0, 1);
+    b0 = P(1, 0);
+    b1 = P(1, 1);
+    c0 = P(2, 0);
+    c1 = P(2, 1);
+    a0.set_prec(n_bits * 8);
+    a1.set_prec(n_bits * 8);
+    b0.set_prec(n_bits * 8);
+    b1.set_prec(n_bits * 8);
+    c0.set_prec(n_bits * 8);
+    c1.set_prec(n_bits * 8);
+    Scalar area = (a0 * b1 - b0 * a1 +
+                  b0 * c1 - c0 * b1 +
+                  c0 * a1 - a0 * c1);
+    mpreal::set_default_prec(n_bits);
+    return area;
+  }
+  else
+  {
+    Scalar a0, a1, b0, b1, c0, c1;
+    a0 = P(0, 0);
+    a1 = P(0, 1);
+    b0 = P(1, 0);
+    b1 = P(1, 1);
+    c0 = P(2, 0);
+    c1 = P(2, 1);
+    return a0 * b1 - b0 * a1 +
+           b0 * c1 - c0 * b1 +
+           c0 * a1 - a0 * c1;
+  }
+}
+
+template <typename Scalar>
 bool segment_segment_intersect(
     const Eigen::Matrix<Scalar, 1, 2> &a,
     const Eigen::Matrix<Scalar, 1, 2> &b,
@@ -376,6 +418,8 @@ bool add_to_table(
     std::vector<std::vector<Angle<Scalar>>> &LA,
     int i, int k, int j)
 {
+
+  // std::cout << "enter add_to_table" << std::endl;
   const int N = P.rows();
   Eigen::Matrix<Scalar, 1, 2> pi = P.row(i);
   Eigen::Matrix<Scalar, 1, 2> pk = P.row(k);
@@ -384,7 +428,11 @@ bool add_to_table(
   Eigen::Matrix<Scalar, 3, 2> T;
   T << pi, pk, pj;
   if (orientation(T) != 1)
+  {
+  // std::cout << "end add_to_table false" << std::endl;
     return false;
+
+  }
 
   Angle<Scalar> I(pj, pi, pk); // J I K
   Angle<Scalar> J(pk, pj, pi); // K J I
@@ -401,12 +449,16 @@ bool add_to_table(
   {
     FA[i][j] = Fr;
     LA[i][j] = La;
+  // std::cout << "end add_to_table true" << std::endl;
+
     return true;
   }
   else
   {
+  // std::cout << "end add_to_table false" << std::endl;
+
     return false;
-  } 
+  }
 }
 
 bool weakly_self_overlapping_str(
@@ -443,8 +495,13 @@ bool weakly_self_overlapping(
   std::vector<std::vector<int>> Q(N, std::vector<int>(N, 0));
   std::vector<std::vector<Angle<Scalar>>> FA(N, std::vector<Angle<Scalar>>(N));
   std::vector<std::vector<Angle<Scalar>>> LA(N, std::vector<Angle<Scalar>>(N));
+
+  // TODO: select the best triangulation
+  Eigen::Matrix<Scalar, -1, -1> min_A(N, N);
+  min_A.setConstant(1e10); // INF=1e10
+
   bool succ = false;
-  int i;
+  // int i;
   for (int i = 0; i < N; i++)
   {
     Q[i][(i + 1) % N] = 1;
@@ -452,35 +509,69 @@ bool weakly_self_overlapping(
     LA[i][(i + 1) % N] = Angle<Scalar>(P.row(i), P.row((i + 1) % N), P.row(i));
   }
   int h = -1;
-  std::vector<std::vector<Scalar>> A(N, std::vector<Scalar>(N, -1));
-  for (int d = 2; d < N && !succ; d++)
+
+  Scalar best_min_A = -1.0;
+  // std::vector<std::vector<Scalar>> A(N, std::vector<Scalar>(N, -1));
+  // for (int d = 2; d < N && !succ; d++)
+  for (int d = 2; d < N; d++)
   {
-    for (i = 0; i < N && !succ; i++)
+    // std::cout << "d = " << d << "/" << N - 1 << std::endl;
+    // for (i = 0; i < N && !succ; i++)
+    for (int i = 0; i < N; i++)
     {
+      // std::cout << "i = " << i << "/" << N - 1 << std::endl;
       int j = (i + d) % N;
       int k = (i + 1) % N;
-      Scalar min_q = -1.0f;
+      // Scalar min_q = -1.0f;
       while (k != j)
       {
+        // std::cout << "k=" << k << "\tj=" << j << std::endl;
         if (Q[i][k] == 1 && Q[k][j] == 1)
         {
           if (add_to_table(P, R, FA, LA, i, k, j))
           {
-            Q[i][j] = 1;
-            K[i][j] = k;
+
+            // Q[i][j] = 1;
+            // K[i][j] = k;
+            // seg min area
+            Eigen::Matrix<Scalar, 1, 2> pi = P.row(i);
+            Eigen::Matrix<Scalar, 1, 2> pk = P.row(k);
+            Eigen::Matrix<Scalar, 1, 2> pj = P.row(j);
+            Eigen::Matrix<Scalar, 3, 2> T;
+            T << pi, pk, pj;
+            Scalar tmp = signed_area(T);
+            Scalar tmp1;
+            tmp1 = min_A(i, k) < min_A(k, j) ? min_A(i, k) : min_A(k, j);
+            tmp1 = tmp < tmp1 ? tmp : tmp1;
+
+            if (Q[i][j] == 0 || tmp1 > min_A(i, j))
+            {
+              Q[i][j] = 1;
+              K[i][j] = k;
+              min_A(i, j) = tmp1;
+            }
+
             if (i == (j + 1) % N)
             {
-              succ = true;
-              h = i;
-              break;
+              // succ = true;
+              std::cout << "h=" << i << "successful with area_min = " << min_A(i, j) << std::endl;
+              if (min_A(i, j) > best_min_A)
+              {
+                std::cout << "new best" << std::endl;
+                best_min_A = min_A(i, j);
+                h = i;
+              }
+              // break;
             }
+
           }
         }
+
         k = (k + 1) % N;
       }
     }
   }
-  std::cout << "test done, h = " << h << std::endl;
+  std::cout << "test done, h = " << h << "\nmin_area = " << best_min_A << std::endl;
   inspect_table(K, Q);
   if (h == -1)
     return false;
