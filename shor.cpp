@@ -419,7 +419,6 @@ bool add_to_table(
     int i, int k, int j)
 {
 
-  // std::cout << "enter add_to_table" << std::endl;
   const int N = P.rows();
   Eigen::Matrix<Scalar, 1, 2> pi = P.row(i);
   Eigen::Matrix<Scalar, 1, 2> pk = P.row(k);
@@ -429,7 +428,6 @@ bool add_to_table(
   T << pi, pk, pj;
   if (orientation(T) != 1)
   {
-  // std::cout << "end add_to_table false" << std::endl;
     return false;
 
   }
@@ -447,15 +445,14 @@ bool add_to_table(
   bool cond_j = ij_2gon ? (La.r == R(j)) : (La.r <= R(j));
   if (cond_i && cond_j && (k1 + k2 + k3).r == R(k))
   {
-    FA[i][j] = Fr;
-    LA[i][j] = La;
-  // std::cout << "end add_to_table true" << std::endl;
+    // // update this outside
+    // FA[i][j] = Fr;
+    // LA[i][j] = La;
 
     return true;
   }
   else
   {
-  // std::cout << "end add_to_table false" << std::endl;
 
     return false;
   }
@@ -549,6 +546,12 @@ bool weakly_self_overlapping(
               Q[i][j] = 1;
               K[i][j] = k;
               min_A(i, j) = tmp1;
+
+              // update FA and LA (instead of updating this in add_to_table)
+              Angle<Scalar> I(pj, pi, pk); // J I K
+              Angle<Scalar> J(pk, pj, pi); // K J I
+              FA[i][j] = I + FA[i][k];
+              LA[i][j] = LA[k][j] + J;
             }
 
             if (i == (j + 1) % N)
