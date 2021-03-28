@@ -81,33 +81,33 @@ Scalar signed_area(const Eigen::Matrix<Scalar, 3, 2> &P)
     mpfr_prec_t n_bits = mpreal::get_default_prec();
     mpreal::set_default_prec(n_bits * 8);
     mpreal a0, a1, b0, b1, c0, c1;
-    a0 = P(0, 0);
-    a1 = P(0, 1);
-    b0 = P(1, 0);
-    b1 = P(1, 1);
-    c0 = P(2, 0);
-    c1 = P(2, 1);
+    a0 = mpfr::mpreal(P(0, 0));
+    a1 = mpfr::mpreal(P(0, 1));
+    b0 = mpfr::mpreal(P(1, 0));
+    b1 = mpfr::mpreal(P(1, 1));
+    c0 = mpfr::mpreal(P(2, 0));
+    c1 = mpfr::mpreal(P(2, 1));
     a0.set_prec(n_bits * 8);
     a1.set_prec(n_bits * 8);
     b0.set_prec(n_bits * 8);
     b1.set_prec(n_bits * 8);
     c0.set_prec(n_bits * 8);
     c1.set_prec(n_bits * 8);
-    Scalar area = (a0 * b1 - b0 * a1 +
-                  b0 * c1 - c0 * b1 +
-                  c0 * a1 - a0 * c1);
+    mpfr::mpreal area = (a0 * b1 - b0 * a1 +
+                         b0 * c1 - c0 * b1 +
+                         c0 * a1 - a0 * c1);
     mpreal::set_default_prec(n_bits);
-    return area;
+    return Scalar(area);
   }
   else
   {
-    Scalar a0, a1, b0, b1, c0, c1;
-    a0 = P(0, 0);
-    a1 = P(0, 1);
-    b0 = P(1, 0);
-    b1 = P(1, 1);
-    c0 = P(2, 0);
-    c1 = P(2, 1);
+    double a0, a1, b0, b1, c0, c1;
+    a0 = double(P(0, 0));
+    a1 = double(P(0, 1));
+    b0 = double(P(1, 0));
+    b1 = double(P(1, 1));
+    c0 = double(P(2, 0));
+    c1 = double(P(2, 1));
     return a0 * b1 - b0 * a1 +
            b0 * c1 - c0 * b1 +
            c0 * a1 - a0 * c1;
