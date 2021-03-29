@@ -145,6 +145,10 @@ Eigen::VectorXi set_all_ri(
     const Eigen::MatrixXi& F
 );
 
+Eigen::VectorXi set_all_ri_str(
+    const std::vector<std::vector<std::string>> &uv_str,
+    const Eigen::MatrixXi &F);
+
 bool Shor_van_wyck(
   const Eigen::MatrixXd& P,
   const Eigen::VectorXi& R,
