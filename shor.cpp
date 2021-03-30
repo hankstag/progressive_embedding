@@ -1108,10 +1108,20 @@ bool Shor_van_wyck_v2(
 
   V = P;
   Fn = F;
-  Eigen::VectorXi bd;
-  igl::boundary_loop(Fn, bd);
-  std::cout << "#P size: " << V.rows() << std::endl;
-  std::cout << "#bd: " << bd.rows() << std::endl;
+
+  if(do_refine){
+
+    // [simplify mesh (subdivide into small polygons)]
+    std::vector<std::vector<int>> L;
+    Eigen::MatrixXd V0 = V.template cast<double>();
+    subdivide_polygon(V0, Fn, L);
+
+    // [refine each small polygon]
+    Eigen::MatrixXd Vn;
+    simplify_triangulation(V0, L, Vn, Fn);
+    V = Vn.template cast<Scalar>();
+
+  }
 
   return true;
 }
