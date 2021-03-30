@@ -6,7 +6,6 @@
 #include <igl/predicates/predicates.h>
 #include "is_simple_polygon.h"
 #include <iostream>
-#include <unsupported/Eigen/MPRealSupport>
 
 using namespace std;
 
@@ -367,68 +366,128 @@ Eigen::VectorXi set_all_ri(
   return R;
 }
 
+void str_to_num(const std::vector<std::vector<std::string>> &uv_str, Eigen::Matrix<mpfr::mpreal, Eigen::Dynamic, Eigen::Dynamic> &uv, int n_digits)
+{
+
+  using mpfr::mpreal;
+  uv.resize(uv_str.size(), 2);
+
+  mpreal::set_default_prec(mpfr::digits2bits(n_digits));
+  std::cout << " set digits: " << n_digits << std::endl;
+
+#ifdef CHECK_MPF_CONFIG
+  using namespace std;
+  const mpreal one = 1.0;
+  const mpreal zero = 0.0;
+  const mpreal eps = std::numeric_limits<mpreal>::epsilon();
+  const int base = std::numeric_limits<mpreal>::radix;
+  const mpreal prec = eps * base;
+  const int bindigits = std::numeric_limits<mpreal>::digits(); // eqv. to mpfr::mpreal::get_default_prec();
+  const mpreal rnd = std::numeric_limits<mpreal>::round_error();
+  const mpreal maxval = std::numeric_limits<mpreal>::max();
+  const mpreal minval = std::numeric_limits<mpreal>::min();
+  const mpreal small = one / maxval;
+  const mpreal sfmin = (small > minval) ? small * (one + eps) : minval;
+  const mpreal round = std::numeric_limits<mpreal>::round_style();
+  const int min_exp = std::numeric_limits<mpreal>::min_exponent;
+  const mpreal underflow = std::numeric_limits<mpreal>::min();
+  const int max_exp = std::numeric_limits<mpreal>::max_exponent;
+  const mpreal overflow = std::numeric_limits<mpreal>::max();
+
+  // Additionally compute pi with required accuracy - just for fun :)
+  const mpreal pi = mpfr::const_pi();
+
+  cout.precision(100); // Show all the digits
+  cout << "pi         =    " << pi << endl;
+  cout << "eps        =    " << eps << endl;
+  cout << "base       =    " << base << endl;
+  cout << "prec       =    " << prec << endl;
+  cout << "b.digits   =    " << bindigits << endl;
+  cout << "rnd        =    " << rnd << endl;
+  cout << "maxval     =    " << maxval << endl;
+  cout << "minval     =    " << minval << endl;
+  cout << "small      =    " << small << endl;
+  cout << "sfmin      =    " << sfmin << endl;
+  cout << "1/sfmin    =    " << 1 / sfmin << endl;
+  cout << "round      =    " << round << endl;
+  cout << "max_exp    =    " << max_exp << endl;
+  cout << "min_exp    =    " << min_exp << endl;
+  cout << "underflow  =    " << underflow << endl;
+  cout << "overflow   =    " << overflow << endl;
+#endif
+  for (int i = 0; i < uv_str.size(); i++)
+  {
+    for (int k = 0; k < 2; k++)
+    {
+      uv(i, k) = mpfr::mpreal(uv_str[i][k]);
+    }
+  }
+  std::cout << "prec passed in from c++: " << uv(0, 0).get_prec() << std::endl;
+}
+
+void num_to_str(Eigen::Matrix<mpfr::mpreal, Eigen::Dynamic, Eigen::Dynamic> &pos, std::vector<std::vector<std::string>> &pos_str)
+{
+
+  using mpfr::mpreal;
+  pos_str.resize(pos.rows());
+
+  mpreal::set_default_prec(mpfr::digits2bits(100));
+// #define CHECK_MPF_CONFIG
+#ifdef CHECK_MPF_CONFIG
+  using namespace std;
+  const mpreal one = 1.0;
+  const mpreal zero = 0.0;
+  const mpreal eps = std::numeric_limits<mpreal>::epsilon();
+  const int base = std::numeric_limits<mpreal>::radix;
+  const mpreal prec = eps * base;
+  const int bindigits = std::numeric_limits<mpreal>::digits(); // eqv. to mpfr::mpreal::get_default_prec();
+  const mpreal rnd = std::numeric_limits<mpreal>::round_error();
+  const mpreal maxval = std::numeric_limits<mpreal>::max();
+  const mpreal minval = std::numeric_limits<mpreal>::min();
+  const mpreal small = one / maxval;
+  const mpreal sfmin = (small > minval) ? small * (one + eps) : minval;
+  const mpreal round = std::numeric_limits<mpreal>::round_style();
+  const int min_exp = std::numeric_limits<mpreal>::min_exponent;
+  const mpreal underflow = std::numeric_limits<mpreal>::min();
+  const int max_exp = std::numeric_limits<mpreal>::max_exponent;
+  const mpreal overflow = std::numeric_limits<mpreal>::max();
+
+  // Additionally compute pi with required accuracy - just for fun :)
+  const mpreal pi = mpfr::const_pi();
+
+  cout.precision(100); // Show all the digits
+  cout << "pi         =    " << pi << endl;
+  cout << "eps        =    " << eps << endl;
+  cout << "base       =    " << base << endl;
+  cout << "prec       =    " << prec << endl;
+  cout << "b.digits   =    " << bindigits << endl;
+  cout << "rnd        =    " << rnd << endl;
+  cout << "maxval     =    " << maxval << endl;
+  cout << "minval     =    " << minval << endl;
+  cout << "small      =    " << small << endl;
+  cout << "sfmin      =    " << sfmin << endl;
+  cout << "1/sfmin    =    " << 1 / sfmin << endl;
+  cout << "round      =    " << round << endl;
+  cout << "max_exp    =    " << max_exp << endl;
+  cout << "min_exp    =    " << min_exp << endl;
+  cout << "underflow  =    " << underflow << endl;
+  cout << "overflow   =    " << overflow << endl;
+#endif
+  std::cout<<"dim of pos: "<<pos.rows()<<","<<pos.cols()<<std::endl;
+  for (int i = 0; i < pos.rows(); i++)
+  {
+    pos_str[i] = std::vector<std::string>(pos.cols(), "");
+    for (int j = 0; j < pos.cols(); j++){
+      pos_str[i][j] = pos(i,j).toString();
+    }
+  }
+}
+
 Eigen::VectorXi set_all_ri_str(
     const std::vector<std::vector<std::string>> &uv_str,
     const Eigen::MatrixXi &F)
 {
 
-  auto str_to_num = [](const std::vector<std::vector<std::string>> &uv_str, Eigen::Matrix<mpfr::mpreal, Eigen::Dynamic, Eigen::Dynamic> &uv, int n_digits){
-
-    using mpfr::mpreal;
-    uv.resize(uv_str.size(), 2);
-
-    mpreal::set_default_prec(mpfr::digits2bits(n_digits));
-    std::cout << " set digits: " << n_digits << std::endl;
-
-  #ifdef CHECK_MPF_CONFIG
-    using namespace std;
-    const mpreal one = 1.0;
-    const mpreal zero = 0.0;
-    const mpreal eps = std::numeric_limits<mpreal>::epsilon();
-    const int base = std::numeric_limits<mpreal>::radix;
-    const mpreal prec = eps * base;
-    const int bindigits = std::numeric_limits<mpreal>::digits(); // eqv. to mpfr::mpreal::get_default_prec();
-    const mpreal rnd = std::numeric_limits<mpreal>::round_error();
-    const mpreal maxval = std::numeric_limits<mpreal>::max();
-    const mpreal minval = std::numeric_limits<mpreal>::min();
-    const mpreal small = one / maxval;
-    const mpreal sfmin = (small > minval) ? small * (one + eps) : minval;
-    const mpreal round = std::numeric_limits<mpreal>::round_style();
-    const int min_exp = std::numeric_limits<mpreal>::min_exponent;
-    const mpreal underflow = std::numeric_limits<mpreal>::min();
-    const int max_exp = std::numeric_limits<mpreal>::max_exponent;
-    const mpreal overflow = std::numeric_limits<mpreal>::max();
-
-    // Additionally compute pi with required accuracy - just for fun :)
-    const mpreal pi = mpfr::const_pi();
-
-    cout.precision(100); // Show all the digits
-    cout << "pi         =    " << pi << endl;
-    cout << "eps        =    " << eps << endl;
-    cout << "base       =    " << base << endl;
-    cout << "prec       =    " << prec << endl;
-    cout << "b.digits   =    " << bindigits << endl;
-    cout << "rnd        =    " << rnd << endl;
-    cout << "maxval     =    " << maxval << endl;
-    cout << "minval     =    " << minval << endl;
-    cout << "small      =    " << small << endl;
-    cout << "sfmin      =    " << sfmin << endl;
-    cout << "1/sfmin    =    " << 1 / sfmin << endl;
-    cout << "round      =    " << round << endl;
-    cout << "max_exp    =    " << max_exp << endl;
-    cout << "min_exp    =    " << min_exp << endl;
-    cout << "underflow  =    " << underflow << endl;
-    cout << "overflow   =    " << overflow << endl;
-  #endif
-    for (int i = 0; i < uv_str.size(); i++)
-    {
-      for (int k = 0; k < 2; k++)
-      {
-        uv(i, k) = mpfr::mpreal(uv_str[i][k]);
-      }
-    }
-    std::cout << "prec passed in from c++: " << uv(0, 0).get_prec() << std::endl;
-  };
   int n_digits = uv_str[0][0].size();
   Eigen::Matrix<mpfr::mpreal, Eigen::Dynamic, Eigen::Dynamic> uv;
   str_to_num(uv_str, uv, n_digits);
@@ -1052,7 +1111,7 @@ bool Shor_van_wyck_v2(
   Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> mP; // P \ colinear vertices
   Eigen::VectorXi mR;
   drop_colinear_v2(P, R, mark, B, mP, mR);
-  std::cout << "after removing colinear #P: " << mP.rows() << std::endl;
+  std::cout << "after removing colinear #P: " << P.rows() <<" => " << mP.rows() << std::endl;
 
   // [ear clipping]
   Eigen::VectorXi D;
@@ -1105,6 +1164,7 @@ bool Shor_van_wyck_v2(
   // [add back colinear vertices by spliting boundary edges]
   std::cout << "add back vertices\n";
   add_colinear(P, nF, B, F);
+  std::cout << "add back done\n";
 
   V = P;
   Fn = F;
@@ -1115,6 +1175,7 @@ bool Shor_van_wyck_v2(
     std::vector<std::vector<int>> L;
     Eigen::MatrixXd V0 = V.template cast<double>();
     subdivide_polygon(V0, Fn, L);
+    std::cout << "subdivde done\n" << std::endl;
 
     // [refine each small polygon]
     Eigen::MatrixXd Vn;

@@ -5,6 +5,7 @@
 #include <iostream>
 #include <igl/triangle/triangulate.h>
 #include <igl/slice.h>
+#include <unsupported/Eigen/MPRealSupport>
 #include <igl/list_to_matrix.h>
 
 template <typename Scalar>
@@ -88,6 +89,9 @@ struct Angle
     return S;
   };
 };
+
+void str_to_num(const std::vector<std::vector<std::string>> &uv_str, Eigen::Matrix<mpfr::mpreal, Eigen::Dynamic, Eigen::Dynamic> &uv, int n_digits);
+void num_to_str(Eigen::Matrix<mpfr::mpreal, Eigen::Dynamic, Eigen::Dynamic> &pos, std::vector<std::vector<std::string>> &pos_str);
 
 Eigen::VectorXi set_ri(
     const Eigen::MatrixXd& uv,
