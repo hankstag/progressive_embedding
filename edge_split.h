@@ -3,27 +3,20 @@
 
 #include <Eigen/Core>
 #include <vector>
-#include "Property.h"
+#include "field/field.h"
+
 
 bool edge_split(
-    std::vector<std::vector<double>>& V0,
-    std::vector<std::vector<int>>& F0,
-    std::vector<std::vector<int>>& FF_vec,
-    std::vector<std::vector<int>>& FFi_vec,
-    int f0,
-    int e0
+  std::vector<std::vector<double>>& V,
+  std::vector<std::vector<int>>& F,
+  std::vector<std::vector<int>>& FF_vec,
+  std::vector<std::vector<int>>& FFi_vec,
+  std::vector<Property>& props,
+  int f0,
+  int e0
 );
 
-bool edge_split(
-    Eigen::MatrixXd& V,
-    Eigen::MatrixXi& F,
-    Eigen::MatrixXi& FF,
-    Eigen::MatrixXi& FFi,
-    int f0,
-    int e0
-);
-
-bool edge_split(
+bool edge_split_m2(
   std::vector<std::vector<double>>& V0,
   std::vector<std::vector<int>>& F0,
   std::vector<std::vector<int>>& FF_vec,
@@ -32,5 +25,6 @@ bool edge_split(
   int f0,
   int e0
 );
+
 
 #endif

@@ -3,7 +3,7 @@
 
 #include "shor.h"
 #include "path_tracing.h"
-#include "Property.h"
+#include "field/field.h"
 #include <igl/harmonic.h>
 
 // given a polygon P and a source mesh M (their boundaries matches in #v)
